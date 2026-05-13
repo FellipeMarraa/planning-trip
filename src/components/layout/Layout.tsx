@@ -15,8 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#0b1222] text-slate-300 font-sans selection:bg-blue-500/30">
-            {/* Nav com Glassmorphism Dark */}
+        <div className="min-h-screen pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">            {/* Nav com Glassmorphism Dark */}
             <nav className="sticky top-0 z-50 w-full border-b border-white/[0.04] bg-[#0b1222]/80 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
