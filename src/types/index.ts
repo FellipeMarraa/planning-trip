@@ -34,4 +34,8 @@ export interface Expense {
     paidBy: string;
     status: 'pago' | 'pendente' | 'reservar';
     date: string;
+
+    spreadApplied?: number;      // O % de taxa aplicado (ex: 1.6)
+    exchangeRateUsed?: number;   // A taxa final com spread (ex: 5.91)
+    baseRateAtTime?: number;
 }

@@ -15,46 +15,48 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#f1f5f9] text-slate-900 font-sans selection:bg-blue-100">
-            {/* Top Navigation - Off-white com Blur */}
-            <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/70 backdrop-blur-md">
+        <div className="min-h-screen bg-[#0b1222] text-slate-300 font-sans selection:bg-blue-500/30">
+            {/* Nav com Glassmorphism Dark */}
+            <nav className="sticky top-0 z-50 w-full border-b border-white/[0.04] bg-[#0b1222]/80 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
+                    {/* Logo Refinada */}
                     <Link to="/" className="flex items-center gap-3 group">
-                        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-200 transition-transform active:scale-95">
-                            <Plane className="w-5 h-5 text-white -rotate-45" />
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20 transition-transform active:scale-95">
+                            <Plane className="w-4 h-4 text-white -rotate-45" />
                         </div>
                         <div className="flex flex-col leading-none">
-                            <span className="font-semibold text-base tracking-tight text-slate-900">
-                                TripPlanner <span className="text-blue-600 font-medium italic">AI</span>
+                            <span className="font-medium text-[15px] tracking-tight text-white">
+                                TripVision <span className="text-blue-500 font-light uppercase text-[10px] ml-1 tracking-[0.2em]">Pro</span>
                             </span>
-                            <span className="text-[9px] text-slate-400 font-bold tracking-[0.1em] uppercase">Premium Access</span>
                         </div>
                     </Link>
 
-                    <div className="flex items-center gap-3 md:gap-5">
+                    <div className="flex items-center gap-3 md:gap-6">
                         {isGlobalAdmin && (
                             <Link to="/admin">
-                                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
+                                <Button variant="ghost" size="icon" className="text-slate-500 hover:text-white hover:bg-white/[0.05] rounded-xl transition-all">
                                     <Settings className="w-4 h-4" />
                                 </Button>
                             </Link>
                         )}
 
-                        <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
+                        <div className="h-4 w-[1px] bg-white/[0.08] mx-1 hidden sm:block" />
 
                         <div className="flex items-center gap-4">
+                            {/* User Info com tipografia sutil */}
                             <div className="text-right hidden md:block">
-                                <p className="text-xs font-semibold text-slate-800 leading-none">{user?.displayName}</p>
-                                <p className="text-[10px] text-slate-400 font-medium mt-1 italic uppercase tracking-tighter">{user?.email}</p>
+                                <p className="text-[11px] font-medium text-slate-200 leading-none">{user?.displayName}</p>
+                                <p className="text-[9px] text-slate-500 font-medium mt-1 uppercase tracking-wider">{user?.email?.split('@')[0]}</p>
                             </div>
 
-                            <div className="w-9 h-9 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            {/* Avatar com borda fina */}
+                            <div className="w-8 h-8 rounded-full border border-white/[0.08] bg-white/[0.03] overflow-hidden shadow-inner">
                                 {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    <img src={user.photoURL} alt="" className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                                        <UserIcon className="w-4 h-4 text-slate-300" />
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <UserIcon className="w-3.5 h-3.5 text-slate-600" />
                                     </div>
                                 )}
                             </div>
@@ -63,7 +65,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleLogout}
-                                className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                className="text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
                             >
                                 <LogOut className="w-4 h-4" />
                             </Button>
@@ -72,7 +74,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
             </nav>
 
-            <main className="max-w-7xl mx-auto px-6 py-10 animate-in fade-in duration-700">
+            {/* Main Content Area */}
+            <main className="max-w-7xl mx-auto px-6 py-10">
                 {children}
             </main>
         </div>
