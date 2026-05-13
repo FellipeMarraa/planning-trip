@@ -1,17 +1,16 @@
 // src/pages/Login.tsx
-import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { Button } from "@/components/ui/button";
+import {useState} from 'react';
+import {useAuth} from '../context/AuthContext';
+import {Button} from "@/components/ui/button";
 import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogFooter,
     AlertDialogTitle,
     AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { LogIn, Plane, ScrollText, ShieldCheck, X } from "lucide-react";
+import {LogIn, Plane, ScrollText, ShieldCheck, X} from "lucide-react";
 
 export default function Login() {
     const { loginWithGoogle } = useAuth();
