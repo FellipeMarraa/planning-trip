@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
     Calendar, ChevronLeft, ChevronRight, CreditCard,
     Plus, TrendingDown, TrendingUp, MoreHorizontal,
-    Pencil, Trash2, Filter, X, Share2, ShieldAlert
+    Pencil, Trash2, Filter, X, Share2, ShieldAlert, Map
 } from "lucide-react";
 import {
     Select,
@@ -39,6 +39,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AddExpenseDialog from '@/components/trip/AddExpenseDialog';
+import TripAnalytics from '@/components/trip/TripAnalytics';
 import type { Expense } from '@/types';
 
 export default function TripDetails() {
@@ -72,13 +73,11 @@ export default function TripDetails() {
         });
     }, [expenses, filterCategory, filterCurrency]);
 
-    // Extrair categorias únicas dinamicamente para o Select
     const categories = useMemo(() => {
         const set = new Set(expenses.map(e => e.category));
         return Array.from(set).sort();
     }, [expenses]);
 
-    // Lógica de Paginação (Aplicada sobre os dados filtrados)
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 8;
     const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage);
@@ -86,7 +85,6 @@ export default function TripDetails() {
 
     if (loading) return null;
 
-    // --- LÓGICA FINANCEIRA ---
     const totalBRLRealizado = expenses.reduce((acc, curr) => acc + (Number(curr.amountBRL) || 0), 0);
     const totalBRLMercado = expenses.reduce((acc, curr) => {
         const taxaHoje = currentRates[curr.currency] || 1;
@@ -95,34 +93,25 @@ export default function TripDetails() {
 
     const variacao = totalBRLRealizado > 0 ? ((totalBRLMercado / totalBRLRealizado - 1) * 100) : 0;
 
-    // --- FUNÇÕES DE AÇÃO ---
-
     const handleDeleteExpense = async () => {
         if (!expenseToDelete) return;
         try {
             await deleteDoc(doc(db, 'expenses', expenseToDelete.id));
             setExpenseToDelete(null);
-        } catch (error) {
-            console.error("Erro ao deletar despesa:", error);
-        }
+        } catch (error) { console.error("Erro ao deletar:", error); }
     };
 
     const handleDeleteTrip = async () => {
         if (!tripId) return;
         try {
             const batch = writeBatch(db);
-            // Buscar todos os gastos vinculados para deletar em lote
             const expensesQty = query(collection(db, 'expenses'), where('tripId', '==', tripId));
             const expensesSnaps = await getDocs(expensesQty);
-
             expensesSnaps.forEach((d) => batch.delete(d.ref));
             batch.delete(doc(db, 'trips', tripId));
-
             await batch.commit();
             navigate('/');
-        } catch (error) {
-            console.error("Erro ao deletar viagem completa:", error);
-        }
+        } catch (error) { console.error("Erro ao deletar viagem:", error); }
     };
 
     const resetFilters = () => {
@@ -134,7 +123,7 @@ export default function TripDetails() {
     const copyInviteLink = (role: 'adm_trip' | 'member') => {
         const url = `${window.location.origin}/join/${tripId}/${role}`;
         navigator.clipboard.writeText(url);
-        alert(`Link de convite para ${role.toUpperCase()} copiado com sucesso!`);
+        alert(`Link de convite para ${role.toUpperCase()} copiado!`);
     };
 
     const formatDate = (dateStr: string | undefined) => {
@@ -145,9 +134,9 @@ export default function TripDetails() {
 
     return (
         <div className="h-full w-full bg-[#f8fafc] text-slate-900 pb-20 font-sans overflow-y-auto">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-6 pt-8">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-8 pt-8">
 
-                {/* Topbar: Nav + Gestão de Viagem */}
+                {/* Topbar: Nav + Gestão */}
                 <div className="flex items-center justify-between">
                     <nav className="flex items-center gap-2 text-slate-400 text-[11px] font-bold uppercase tracking-[0.15em]">
                         <button onClick={() => navigate('/')} className="hover:text-blue-600 transition-colors">Portfólio</button>
@@ -164,14 +153,14 @@ export default function TripDetails() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
                                 <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-slate-400">Gestão da Viagem</DropdownMenuLabel>
-                                <DropdownMenuItem onClick={() => copyInviteLink('adm_trip')} className="cursor-pointer">
+                                <DropdownMenuItem onClick={() => copyInviteLink('adm_trip')} className="cursor-pointer text-[12px] font-medium">
                                     <Share2 className="w-4 h-4 mr-2 text-blue-500" /> Convidar Administrador
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => copyInviteLink('member')} className="cursor-pointer">
+                                <DropdownMenuItem onClick={() => copyInviteLink('member')} className="cursor-pointer text-[12px] font-medium">
                                     <Share2 className="w-4 h-4 mr-2 text-emerald-500" /> Convidar Membro
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setIsDeleteTripOpen(true)} className="text-red-600 focus:text-red-600 cursor-pointer">
+                                <DropdownMenuItem onClick={() => setIsDeleteTripOpen(true)} className="text-red-600 focus:text-red-600 cursor-pointer text-[12px] font-medium">
                                     <Trash2 className="w-4 h-4 mr-2" /> Deletar Viagem Completa
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -179,10 +168,20 @@ export default function TripDetails() {
                     )}
                 </div>
 
-                {/* Header Técnico */}
+                {/* Header Técnico com Acesso ao Roteiro */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
-                    <div className="space-y-1">
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 uppercase italic">{trip?.name}</h1>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 uppercase italic">{trip?.name}</h1>
+                            <Button
+                                onClick={() => navigate(`/trip/${tripId}/itinerary`)}
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-3 rounded-full border-blue-100 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                            >
+                                <Map className="w-3 h-3 mr-1.5" /> Ver Roteiro
+                            </Button>
+                        </div>
                         <div className="flex items-center gap-3 text-slate-500 text-[12px] font-medium">
                             <Calendar className="w-4 h-4 text-slate-300" />
                             {formatDate(trip?.startDate)} — {formatDate(trip?.endDate)}
@@ -191,14 +190,14 @@ export default function TripDetails() {
                     {isAdmin && (
                         <Button
                             onClick={() => { setExpenseToEdit(undefined); setIsAddExpenseOpen(true); }}
-                            className="bg-slate-900 hover:bg-slate-800 text-white h-9 px-5 rounded-md text-[11px] font-bold uppercase tracking-widest shadow-sm transition-all active:scale-95 w-full md:w-auto"
+                            className="bg-slate-900 hover:bg-slate-800 text-white h-10 px-6 rounded-md text-[11px] font-bold uppercase tracking-widest shadow-sm transition-all active:scale-95 w-full md:w-auto"
                         >
                             <Plus className="w-3.5 h-3.5 mr-2" /> Registrar Débito
                         </Button>
                     )}
                 </div>
 
-                {/* Grid de KPIs Financeiros */}
+                {/* KPIs */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <Card className="bg-white border-slate-200 shadow-sm rounded-md p-5 border-l-2 border-l-blue-600">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1 block">Total Pago (Realizado)</span>
@@ -235,7 +234,10 @@ export default function TripDetails() {
                     </Card>
                 </div>
 
-                {/* Toolbar de Filtros Responsiva */}
+                {/* Análise Visual */}
+                <TripAnalytics expenses={expenses} />
+
+                {/* Toolbar de Filtros */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white border border-slate-200 p-3 rounded-md shadow-sm">
                     <div className="hidden sm:flex items-center gap-2 text-slate-400 mr-2 border-r border-slate-100 pr-4">
                         <Filter className="w-3.5 h-3.5" />
@@ -279,11 +281,11 @@ export default function TripDetails() {
                     </div>
                 </div>
 
-                {/* Tabela de Extrato Detalhado */}
+                {/* Tabela */}
                 <div className="bg-white border border-slate-200 rounded-md shadow-sm overflow-hidden">
                     <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                         <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <CreditCard className="w-4 h-4 text-slate-400" /> Extrato Detalhado
+                            <CreditCard className="w-4 h-4 text-slate-400" /> Extrato Detalhado de Lançamentos
                         </h3>
                     </div>
 
@@ -317,7 +319,7 @@ export default function TripDetails() {
                                                 </span>
                                         </td>
                                         <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                <span className="text-[12px] text-slate-500 tabular-nums font-medium">
+                                                <span className="text-[12px] text-slate-600 tabular-nums font-medium">
                                                     {expense.amountOriginal} {expense.currency}
                                                 </span>
                                         </td>
@@ -352,85 +354,38 @@ export default function TripDetails() {
                         </table>
                     </div>
 
-                    {/* Footer / Paginação */}
+                    {/* Paginação */}
                     {totalPages > 1 && (
                         <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <p className="text-[11px] text-slate-400 font-medium whitespace-nowrap">
                                 Mostrando <span className="text-slate-700 font-bold">{paginatedExpenses.length}</span> de <span className="text-slate-700 font-bold">{filteredExpenses.length}</span> resultados
                             </p>
-
                             <div className="flex items-center gap-4">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(p => p - 1)}
-                                    className="h-8 w-8 p-0 border-slate-200 bg-white"
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </Button>
-
-                                <div className="text-[11px] font-bold text-slate-700 tabular-nums min-w-[60px] text-center whitespace-nowrap">
-                                    Página {currentPage} / {totalPages}
-                                </div>
-
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(p => p + 1)}
-                                    className="h-8 w-8 p-0 border-slate-200 bg-white"
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </Button>
+                                <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 w-8 p-0 border-slate-200 bg-white"><ChevronLeft className="w-4 h-4" /></Button>
+                                <div className="text-[11px] font-bold text-slate-700 tabular-nums min-w-[60px] text-center whitespace-nowrap">Página {currentPage} / {totalPages}</div>
+                                <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-8 w-8 p-0 border-slate-200 bg-white"><ChevronRight className="w-4 h-4" /></Button>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Injeção de Modais */}
-            {trip && (
-                <AddExpenseDialog
-                    open={isAddExpenseOpen}
-                    onOpenChange={setIsAddExpenseOpen}
-                    trip={trip}
-                    expenseToEdit={expenseToEdit}
-                />
-            )}
-
-            {/* Alerta de Deleção de Despesa */}
+            {/* Modais */}
+            {trip && <AddExpenseDialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen} trip={trip} expenseToEdit={expenseToEdit} />}
             <AlertDialog open={!!expenseToDelete} onOpenChange={() => setExpenseToDelete(null)}>
                 <AlertDialogContent className="rounded-xl border-slate-200 shadow-2xl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-slate-900 font-bold tracking-tight">Confirmar exclusão?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-slate-500 text-sm">
-                            Esta ação removerá o lançamento <span className="font-bold text-slate-900">"{expenseToDelete?.description}"</span> permanentemente.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-lg border-slate-200 text-[11px] font-bold uppercase tracking-widest text-slate-400">Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteExpense} className="rounded-lg bg-red-600 hover:bg-red-700 text-[11px] font-bold uppercase tracking-widest">Confirmar Exclusão</AlertDialogAction>
-                    </AlertDialogFooter>
+                    <AlertDialogHeader><AlertDialogTitle className="text-slate-900 font-bold tracking-tight">Confirmar exclusão?</AlertDialogTitle></AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-lg border-slate-200 text-[11px] font-bold uppercase tracking-widest text-slate-400">Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteExpense} className="rounded-lg bg-red-600 hover:bg-red-700 text-[11px] font-bold uppercase tracking-widest">Confirmar Exclusão</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-
-            {/* Alerta de Deleção de Viagem Completa */}
             <AlertDialog open={isDeleteTripOpen} onOpenChange={setIsDeleteTripOpen}>
                 <AlertDialogContent className="rounded-xl border-red-100 shadow-2xl">
                     <AlertDialogHeader>
-                        <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-4">
-                            <ShieldAlert className="w-6 h-6 text-red-600" />
-                        </div>
-                        <AlertDialogTitle className="text-slate-900 font-bold tracking-tight">CUIDADO: Apagar Viagem Inteira?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-slate-500 text-sm leading-relaxed">
-                            Você está prestes a deletar <span className="font-bold text-red-600">{trip?.name}</span>. Isso apagará permanentemente todos os lançamentos, taxas de câmbio e acessos de outros membros. **Não há como desfazer.**
-                        </AlertDialogDescription>
+                        <ShieldAlert className="w-12 h-12 text-red-600 mb-2" />
+                        <AlertDialogTitle>Apagar Viagem Completa?</AlertDialogTitle>
+                        <AlertDialogDescription>Esta ação é irreversível.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2 mt-4">
-                        <AlertDialogCancel className="rounded-lg border-slate-200 text-[11px] font-bold uppercase tracking-widest text-slate-400">Abortar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteTrip} className="rounded-lg bg-red-600 hover:bg-red-700 text-[11px] font-bold uppercase tracking-widest">Sim, Apagar Tudo</AlertDialogAction>
-                    </AlertDialogFooter>
+                    <AlertDialogFooter><AlertDialogCancel>Abortar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteTrip} className="bg-red-600 hover:bg-red-700 uppercase font-bold text-[11px]">Sim, Apagar Tudo</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>

@@ -1,3 +1,4 @@
+// src/App.tsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -5,7 +6,8 @@ import Login from './pages/Login';
 import Layout from './components/layout/Layout';
 import Dashboard from "@/pages/Dashboard.tsx";
 import TripDetails from "@/pages/TripDetails.tsx";
-import JoinTrip from "@/pages/JoinTrip.tsx"; // Certifique-se de importar a página que criamos
+import JoinTrip from "@/pages/JoinTrip.tsx";
+import TripItineraryPage from "@/pages/TripItineraryPage.tsx"; // Nova importação
 
 const GlobalAdminPlaceholder = () => (
     <div className="space-y-2">
@@ -31,7 +33,11 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
         return <Navigate to="/" replace />;
     }
 
-    return <Layout>{children}</Layout>;
+    // A página de itinerário tem layout próprio (Dark Mode imersivo),
+    // então verificamos se devemos renderizar com ou sem o Layout padrão.
+    const isItinerary = window.location.pathname.includes('/itinerary');
+
+    return isItinerary ? <>{children}</> : <Layout>{children}</Layout>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
@@ -62,10 +68,24 @@ export default function App() {
                         </ProtectedRoute>
                     } />
 
-                    {/* ROTA FALTANTE: Detalhes da Viagem */}
+                    {/* Detalhes da Viagem (Financeiro) */}
                     <Route path="/trip/:tripId" element={
                         <ProtectedRoute>
                             <TripDetails />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* ROTA IMERSIVA: Itinerário da Viagem */}
+                    <Route path="/trip/:tripId/itinerary" element={
+                        <ProtectedRoute>
+                            <TripItineraryPage />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* Rota de Convite */}
+                    <Route path="/join/:tripId/:role" element={
+                        <ProtectedRoute>
+                            <JoinTrip />
                         </ProtectedRoute>
                     } />
 
@@ -73,12 +93,6 @@ export default function App() {
                     <Route path="/admin" element={
                         <ProtectedRoute roleRequired="GLOBAL">
                             <GlobalAdminPlaceholder />
-                        </ProtectedRoute>
-                    } />
-
-                    <Route path="/join/:tripId/:role" element={
-                        <ProtectedRoute>
-                            <JoinTrip />
                         </ProtectedRoute>
                     } />
 
