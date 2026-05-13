@@ -55,7 +55,7 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
                 roles: { [user.uid]: 'ADM_TRIP' },
                 baseCurrency: formData.baseCurrency,
                 exchangeRates: {
-                    'EUR': 6.12, // Valores sutilmente atualizados
+                    'EUR': 6.12,
                     'GBP': 7.34,
                     'USD': 5.45
                 },
@@ -73,55 +73,60 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-[#0f172a] border-slate-800 text-slate-100 max-w-[400px] w-[95vw] p-0 overflow-hidden rounded-[2.5rem] ring-1 ring-white/5 shadow-2xl animate-in zoom-in-95 duration-200">
+            {/*
+               Mudança principal: Fundo Branco (White) com anel de borda Slate-200.
+               Arredondamento reduzido para 2xl (mais sóbrio).
+            */}
+            <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-[420px] w-[95vw] p-0 overflow-hidden rounded-2xl shadow-2xl shadow-slate-200/50 border-none ring-1 ring-slate-200">
                 <form onSubmit={handleSubmit}>
-                    {/* Header com tom Slate mais claro */}
-                    <DialogHeader className="p-7 pb-6 border-b border-slate-800/50 bg-slate-900/40">
+
+                    {/* Header: Off-white sutil (Slate-50) para separação visual elegante */}
+                    <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-slate-50/50">
                         <div className="flex items-center gap-4">
-                            <div className="p-3.5 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 shadow-inner">
-                                <Plane className="w-6 h-6 text-indigo-400 -rotate-45" />
+                            <div className="p-2.5 bg-blue-600 rounded-xl shadow-md shadow-blue-100">
+                                <Plane className="w-5 h-5 text-white -rotate-45" />
                             </div>
                             <div>
-                                <DialogTitle className="text-xl font-black uppercase tracking-tighter italic leading-none text-white">Novo Roteiro</DialogTitle>
-                                <p className="text-[10px] text-slate-500 font-bold tracking-[0.2em] uppercase mt-1.5">Configuração inicial</p>
+                                <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">Configurar Viagem</DialogTitle>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-0.5">Parâmetros iniciais do roteiro</p>
                             </div>
                         </div>
                     </DialogHeader>
 
-                    <div className="p-7 space-y-7">
-                        {/* Input Título */}
-                        <div className="space-y-2.5">
-                            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1">Título da Viagem</Label>
+                    <div className="p-6 space-y-6">
+                        {/* Campo: Nome */}
+                        <div className="space-y-2">
+                            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Destino ou Título</Label>
                             <Input
-                                placeholder="Ex: Lua de Mel 2026"
-                                className="bg-slate-950 border-slate-800 h-14 text-sm rounded-2xl focus-visible:ring-indigo-500/50 transition-all placeholder:text-slate-700 text-slate-100 border-opacity-50"
+                                placeholder="Ex: Eurotrip Primavera"
+                                className="bg-white border-slate-200 h-11 text-sm rounded-lg focus-visible:ring-blue-600/20 focus-visible:border-blue-600 transition-all placeholder:text-slate-300"
                                 value={formData.name}
                                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                                 required
                             />
                         </div>
 
-                        {/* Grid Datas */}
-                        <div className="grid grid-cols-2 gap-5">
-                            <div className="space-y-2.5">
-                                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1 flex items-center gap-2">
-                                    <CalendarIcon className="w-3 h-3 text-indigo-500" /> Início
+                        {/* Grid: Datas */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5 flex items-center gap-1.5">
+                                    <CalendarIcon className="w-3 h-3" /> Partida
                                 </Label>
                                 <Input
                                     type="date"
-                                    className="bg-slate-950 border-slate-800 text-xs h-14 rounded-2xl [color-scheme:dark] text-slate-100 border-opacity-50"
+                                    className="bg-white border-slate-200 text-xs h-11 rounded-lg focus-visible:ring-blue-600/20"
                                     value={formData.startDate}
                                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                                     required
                                 />
                             </div>
-                            <div className="space-y-2.5">
-                                <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1 flex items-center gap-2">
-                                    <CalendarIcon className="w-3 h-3 text-indigo-500" /> Fim
+                            <div className="space-y-2">
+                                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5 flex items-center gap-1.5">
+                                    <CalendarIcon className="w-3 h-3" /> Retorno
                                 </Label>
                                 <Input
                                     type="date"
-                                    className="bg-slate-950 border-slate-800 text-xs h-14 rounded-2xl [color-scheme:dark] text-slate-100 border-opacity-50"
+                                    className="bg-white border-slate-200 text-xs h-11 rounded-lg focus-visible:ring-blue-600/20"
                                     value={formData.endDate}
                                     onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                                     required
@@ -129,46 +134,47 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
                             </div>
                         </div>
 
-                        {/* Select Moeda */}
-                        <div className="space-y-2.5">
-                            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 ml-1 flex w-full items-center gap-2">
-                                <Wallet2 className="w-3 h-3 text-indigo-500" /> Moeda Principal
+                        {/* Campo: Moeda Principal */}
+                        <div className="space-y-2">
+                            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5 flex items-center gap-1.5">
+                                <Wallet2 className="w-3 h-3" /> Moeda de Referência
                             </Label>
                             <Select
                                 value={formData.baseCurrency}
-                                onValueChange={(v: BaseCurrency | null) => {
-                                    if (v) setFormData({...formData, baseCurrency: v});
+                                onValueChange={(v: string) => {
+                                    setFormData({ ...formData, baseCurrency: v as BaseCurrency });
                                 }}
                             >
-                                <SelectTrigger className="w-40 bg-slate-950 border-slate-800 h-14 text-xs rounded-2xl text-slate-100 border-opacity-50">
+                                <SelectTrigger className="w-full bg-white border-slate-200 h-11 text-xs rounded-lg focus:ring-blue-600/20">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-slate-800 text-slate-100 rounded-2xl shadow-2xl">
-                                    <SelectItem value="EUR" className="text-xs focus:bg-indigo-600 focus:text-white transition-colors">Euro (€)</SelectItem>
-                                    <SelectItem value="GBP" className="text-xs focus:bg-indigo-600 focus:text-white transition-colors">Libra (£)</SelectItem>
-                                    <SelectItem value="USD" className="text-xs focus:bg-indigo-600 focus:text-white transition-colors">Dólar ($)</SelectItem>
-                                    <SelectItem value="BRL" className="text-xs focus:bg-indigo-600 focus:text-white transition-colors">Real (R$)</SelectItem>
+                                <SelectContent className="bg-white border-slate-200 rounded-lg shadow-xl">
+                                    <SelectItem value="EUR" className="text-xs">Euro (€)</SelectItem>
+                                    <SelectItem value="GBP" className="text-xs">Libra (£)</SelectItem>
+                                    <SelectItem value="USD" className="text-xs">Dólar ($)</SelectItem>
+                                    <SelectItem value="BRL" className="text-xs">Real (R$)</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <p className="text-[10px] text-slate-400 italic ml-1">* Todos os gastos serão consolidados nesta moeda.</p>
                         </div>
                     </div>
 
-                    {/* Footer com botões robustos */}
-                    <DialogFooter className="p-7 bg-slate-900/40 border-t border-slate-800/50 flex flex-row gap-4">
+                    {/* Footer: Cinza claro (Slate-50) para um fechamento limpo */}
+                    <DialogFooter className="p-6 bg-slate-50/80 border-t border-slate-100 flex flex-row gap-3">
                         <Button
                             type="button"
                             variant="ghost"
                             onClick={() => onOpenChange(false)}
-                            className="flex-1 min-h-[52px] text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white hover:bg-slate-800 rounded-2xl transition-all"
+                            className="flex-1 h-11 text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
                         >
                             Cancelar
                         </Button>
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 min-h-[52px] bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-indigo-500/20 active:scale-[0.97] transition-all"
+                            className="flex-1 h-11 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold uppercase tracking-widest rounded-lg shadow-md transition-all active:scale-[0.97]"
                         >
-                            {loading ? "Gravando..." : "Confirmar"}
+                            {loading ? "Processando..." : "Confirmar"}
                         </Button>
                     </DialogFooter>
                 </form>

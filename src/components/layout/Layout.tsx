@@ -5,11 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plane, LogOut, User as UserIcon, Settings } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
 
-interface LayoutProps {
-    children: React.ReactNode;
-}
-
-export default function Layout({ children }: LayoutProps) {
+export default function Layout({ children }: { children: React.ReactNode }) {
     const { user, logout, isGlobalAdmin } = useAuth();
     const navigate = useNavigate();
 
@@ -19,68 +15,55 @@ export default function Layout({ children }: LayoutProps) {
     };
 
     return (
-        <div className="min-h-screen bg-[#0f172a] text-slate-100 selection:bg-indigo-500/30 font-sans">
-            {/* Top Navigation - Estilo Soft Slate com Glassmorphism */}
-            <nav className="sticky top-0 z-50 w-full border-b border-slate-800/50 bg-[#0f172a]/80 backdrop-blur-md">
-                <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                    {/* Logo Area */}
-                    <Link to="/" className="flex items-center gap-2.5 group">
-                        <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center group-hover:border-indigo-500/50 transition-all shadow-lg">
-                            <Plane className="w-5 h-5 text-indigo-400 -rotate-45" />
+        <div className="min-h-screen bg-[#f1f5f9] text-slate-900 font-sans selection:bg-blue-100">
+            {/* Top Navigation - Off-white com Blur */}
+            <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/70 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+
+                    <Link to="/" className="flex items-center gap-3 group">
+                        <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-200 transition-transform active:scale-95">
+                            <Plane className="w-5 h-5 text-white -rotate-45" />
                         </div>
                         <div className="flex flex-col leading-none">
-                            <span className="font-black text-sm tracking-tighter uppercase italic">
-                                TripPlanner <span className="text-indigo-500 text-xs">AI</span>
+                            <span className="font-semibold text-base tracking-tight text-slate-900">
+                                TripPlanner <span className="text-blue-600 font-medium italic">AI</span>
                             </span>
-                            <span className="text-[8px] text-slate-500 font-bold tracking-[0.2em] uppercase">Premium</span>
+                            <span className="text-[9px] text-slate-400 font-bold tracking-[0.1em] uppercase">Premium Access</span>
                         </div>
                     </Link>
 
-                    {/* Actions Area */}
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="flex items-center gap-3 md:gap-5">
                         {isGlobalAdmin && (
                             <Link to="/admin">
-                                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-colors">
+                                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
                                     <Settings className="w-4 h-4" />
                                 </Button>
                             </Link>
                         )}
 
-                        <div className="h-6 w-[1px] bg-slate-800 mx-1 hidden sm:block" />
+                        <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block" />
 
-                        <div className="flex items-center gap-3">
-                            {/* User Info (Desktop) */}
+                        <div className="flex items-center gap-4">
                             <div className="text-right hidden md:block">
-                                <p className="text-[11px] font-bold text-slate-200 leading-none">
-                                    {user?.displayName || 'Viajante'}
-                                </p>
-                                <p className="text-[9px] text-slate-500 font-medium tracking-tight">
-                                    {user?.email}
-                                </p>
+                                <p className="text-xs font-semibold text-slate-800 leading-none">{user?.displayName}</p>
+                                <p className="text-[10px] text-slate-400 font-medium mt-1 italic uppercase tracking-tighter">{user?.email}</p>
                             </div>
 
-                            {/* User Avatar com Correção de Foto */}
-                            <div className="relative group">
-                                <div className="absolute -inset-0.5 bg-indigo-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition duration-300"></div>
-                                <div className="relative w-9 h-9 rounded-xl border border-slate-700 bg-slate-800 flex items-center justify-center overflow-hidden shadow-inner">
-                                    {user?.photoURL ? (
-                                        <img
-                                            src={user.photoURL}
-                                            alt="Profile"
-                                            className="w-full h-full object-cover"
-                                            referrerPolicy="no-referrer"
-                                        />
-                                    ) : (
-                                        <UserIcon className="w-4 h-4 text-slate-500" />
-                                    )}
-                                </div>
+                            <div className="w-9 h-9 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                                {user?.photoURL ? (
+                                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                        <UserIcon className="w-4 h-4 text-slate-300" />
+                                    </div>
+                                )}
                             </div>
 
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleLogout}
-                                className="text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                                className="text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             >
                                 <LogOut className="w-4 h-4" />
                             </Button>
@@ -89,8 +72,7 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
             </nav>
 
-            {/* Main Content - Centralizado e Responsivo */}
-            <main className="container mx-auto px-4 sm:px-6 py-6 sm:py-10 animate-in fade-in slide-in-from-top-1 duration-700">
+            <main className="max-w-7xl mx-auto px-6 py-10 animate-in fade-in duration-700">
                 {children}
             </main>
         </div>

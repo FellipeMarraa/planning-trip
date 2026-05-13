@@ -1,11 +1,11 @@
-// src/App.tsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Layout from './components/layout/Layout';
 import Dashboard from "@/pages/Dashboard.tsx";
-import TripDetails from "@/pages/TripDetails.tsx"; // Certifique-se de importar a página que criamos
+import TripDetails from "@/pages/TripDetails.tsx";
+import JoinTrip from "@/pages/JoinTrip.tsx"; // Certifique-se de importar a página que criamos
 
 const GlobalAdminPlaceholder = () => (
     <div className="space-y-2">
@@ -73,6 +73,12 @@ export default function App() {
                     <Route path="/admin" element={
                         <ProtectedRoute roleRequired="GLOBAL">
                             <GlobalAdminPlaceholder />
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="/join/:tripId/:role" element={
+                        <ProtectedRoute>
+                            <JoinTrip />
                         </ProtectedRoute>
                     } />
 

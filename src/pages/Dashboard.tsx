@@ -1,11 +1,10 @@
 // src/pages/Dashboard.tsx
-import { useState } from "react";
-import { useUserTrips } from '../hooks/useUserTrips';
-import { useAuth } from '../context/AuthContext';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Calendar, MapPin, Users, ArrowRight, PlaneTakeoff, User as UserIcon } from "lucide-react";
-import { useNavigate } from 'react-router-dom';
+import {useState} from "react";
+import {useUserTrips} from '../hooks/useUserTrips';
+import {useAuth} from '../context/AuthContext';
+import {Button} from "@/components/ui/button";
+import {ArrowRight, Calendar, MapPin, Plane, Plus, Users} from "lucide-react";
+import {useNavigate} from 'react-router-dom';
 import CreateTripDialog from '../components/trip/CreateTripDialog';
 
 export default function Dashboard() {
@@ -16,121 +15,79 @@ export default function Dashboard() {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-4 bg-[#0f172a]">
-                <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">Sincronizando...</p>
+            <div className="min-h-screen bg-[#f1f5f9] flex flex-col items-center justify-center gap-3">
+                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-[#0f172a] text-slate-100 space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto px-4 sm:px-6 mb-10">
-            {/* Header com Foto de Perfil */}
-            <div className="flex items-center justify-between pt-8">
-                <div className="flex items-center gap-4">
-                    {/* Container da Foto com efeito Glow Suave */}
-                    <div className="relative">
-                        <div className="absolute -inset-1 bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 rounded-2xl blur-sm"></div>
-                        <div className="relative w-14 h-14 rounded-2xl border border-slate-700 bg-slate-800 flex items-center justify-center overflow-hidden shadow-2xl">
-                            {user?.photoURL ? (
-                                <img
-                                    src={user.photoURL}
-                                    alt="Profile"
-                                    className="w-full h-full object-cover"
-                                    referrerPolicy="no-referrer" // Importante para carregar fotos do Google
-                                />
-                            ) : (
-                                <UserIcon className="w-6 h-6 text-slate-500" />
-                            )}
-                        </div>
-                    </div>
-
-                    <div>
-                        <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] mb-0.5 italic">Dashboard</p>
-                        <h2 className="text-2xl font-extrabold tracking-tighter">
-                            Olá, {user?.displayName?.split(' ')[0] || 'Viajante'}
-                        </h2>
-                    </div>
+        <div className="min-h-screen bg-[#f1f5f9] text-slate-900 space-y-10">
+            {/* Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                    <p className="text-[10px] text-blue-600 font-bold uppercase tracking-[0.2em] mb-1 italic opacity-70">Vision Console</p>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+                        Olá, {user?.displayName?.split(' ')[0]}
+                    </h2>
                 </div>
 
                 <Button
                     onClick={() => setIsCreateOpen(true)}
-                    className="rounded-2xl h-14 w-14 bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all border border-indigo-400/30"
+                    className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg h-12 px-8 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95"
                 >
-                    <Plus className="w-7 h-7 text-white" />
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo Projeto
                 </Button>
             </div>
 
-            {/* Listagem de Viagens */}
-            {trips.length === 0 ? (
-                <Card className="bg-slate-900/40 border-slate-800 border-dashed py-16 ring-1 ring-white/5 shadow-2xl">
-                    <CardContent className="flex flex-col items-center text-center space-y-6">
-                        <div className="p-5 bg-slate-800/50 rounded-3xl border border-slate-700/50 text-slate-500">
-                            <PlaneTakeoff className="w-10 h-10" />
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-slate-100 text-lg font-bold italic">Nenhum roteiro ainda</p>
-                            <p className="text-xs text-slate-400 max-w-[240px] leading-relaxed">
-                                Comece a planear a sua Lua de Mel agora mesmo.
-                            </p>
-                        </div>
-                        <Button
-                            onClick={() => setIsCreateOpen(true)}
-                            className="bg-slate-100 hover:bg-white text-slate-950 text-[10px] font-black uppercase tracking-widest px-10 h-11 rounded-xl"
-                        >
-                            Criar Viagem
-                        </Button>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {trips.map((trip) => (
-                        <Card
-                            key={trip.id}
-                            onClick={() => navigate(`/trip/${trip.id}`)}
-                            className="group bg-slate-900/60 border-slate-800 hover:border-indigo-500/50 transition-all cursor-pointer ring-1 ring-white/5 overflow-hidden rounded-[2rem] shadow-xl"
-                        >
-                            <CardContent className="p-0">
-                                <div className="p-6 space-y-5">
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-1.5 text-slate-100">
-                                            <h3 className="text-xl font-bold group-hover:text-indigo-400 transition-colors tracking-tight italic">{trip.name}</h3>
-                                            <div className="flex items-center gap-2">
-                                                <MapPin className="w-3.5 h-3.5 text-indigo-500" />
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Eurotrip 2025</span>
-                                            </div>
-                                        </div>
-                                        <div className="p-2.5 bg-slate-800/50 rounded-2xl border border-slate-700/50">
-                                            <Calendar className="w-4 h-4 text-slate-400" />
-                                        </div>
+            {/* Grid de Viagens */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                {trips.map((trip) => (
+                    <div
+                        key={trip.id}
+                        onClick={() => navigate(`/trip/${trip.id}`)}
+                        className="group bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all cursor-pointer overflow-hidden flex flex-col"
+                    >
+                        <div className="p-6 flex-grow space-y-6">
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-1.5">
+                                    <h3 className="text-lg font-bold text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors uppercase italic">
+                                        {trip.name}
+                                    </h3>
+                                    <div className="flex items-center gap-1.5 text-slate-400">
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        <span className="text-[9px] font-bold uppercase tracking-widest">Ativo</span>
                                     </div>
+                                </div>
+                                <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center border border-slate-100 text-slate-300 group-hover:text-blue-500 transition-colors">
+                                    <Plane className="w-5 h-5 -rotate-45" />
+                                </div>
+                            </div>
 
-                                    <div className="flex items-center gap-4 pt-4 border-t border-slate-800/30">
-                                        <div className="flex-1 space-y-0.5">
-                                            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Período</p>
-                                            <p className="text-xs text-slate-300 font-bold tabular-nums italic">
-                                                {new Date(trip.startDate).toLocaleDateString()} — {new Date(trip.endDate).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                        <div className="flex -space-x-3">
-                                            <div className="w-8 h-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center shadow-lg">
-                                                <Users className="w-3.5 h-3.5 text-slate-500" />
-                                            </div>
-                                            <div className="w-8 h-8 rounded-full border-2 border-slate-900 bg-indigo-600/20 flex items-center justify-center shadow-lg">
-                                                <Users className="w-3.5 h-3.5 text-indigo-400" />
-                                            </div>
-                                        </div>
+                            <div className="flex items-center gap-6 pt-4 border-t border-slate-50">
+                                <div className="flex-1">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Check-in / Out</p>
+                                    <div className="flex items-center gap-2 text-slate-600 font-semibold text-xs tabular-nums">
+                                        <Calendar className="w-3.5 h-3.5 opacity-40" />
+                                        {new Date(trip.startDate).toLocaleDateString()} — {new Date(trip.endDate).toLocaleDateString()}
                                     </div>
                                 </div>
-                                <div className="bg-slate-800/20 px-6 py-4 flex justify-between items-center group-hover:bg-indigo-500/10 transition-all border-t border-slate-800/20">
-                                    <span className="text-[10px] font-black text-slate-500 group-hover:text-indigo-400 uppercase tracking-[0.2em]">Ver Detalhes</span>
-                                    <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                                <div className="flex -space-x-2">
+                                    <div className="w-7 h-7 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-slate-400 shadow-sm">
+                                        <Users className="w-3 h-3" />
+                                    </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            )}
+                            </div>
+                        </div>
+
+                        <div className="px-6 py-4 bg-slate-50/50 flex justify-between items-center border-t border-slate-100">
+                            <span className="text-[9px] font-bold text-slate-400 group-hover:text-blue-600 uppercase tracking-widest transition-colors italic">Painel de Controle</span>
+                            <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                        </div>
+                    </div>
+                ))}
+            </div>
 
             <CreateTripDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
         </div>

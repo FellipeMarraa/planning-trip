@@ -30,7 +30,8 @@ export interface Expense {
     amountOriginal: number;
     currency: string;
     amountBRL: number;
-    paidBy: string; // UID de quem pagou
+    exchangeRateAtTime: number;
+    paidBy: string;
     status: 'pago' | 'pendente' | 'reservar';
     date: string;
 }
