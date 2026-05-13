@@ -146,7 +146,7 @@ export default function TripDetails() {
 
     return (
         <div className="min-h-screen w-full bg-[#0b1222] text-slate-300 pb-20 font-sans overflow-y-auto pt-[env(safe-area-inset-top)]">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-8 pt-8">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-8">
 
                 {/* Topbar: Nav + Gestão */}
                 <div className="flex items-center justify-between">
