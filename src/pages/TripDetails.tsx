@@ -189,7 +189,7 @@ export default function TripDetails() {
                                 onClick={() => navigate(`/trip/${tripId}/itinerary`)}
                                 className="h-7 px-4 rounded-full bg-blue-600/10 border border-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-lg shadow-blue-900/20"
                             >
-                                <Map className="w-3 h-3 mr-1.5" /> Explorer Mode
+                                <Map className="w-3 h-3 mr-1.5" /> Roteiro
                             </Button>
                         </div>
                         <div className="flex items-center gap-3 text-slate-500 text-[11px] font-semibold uppercase tracking-wider">
