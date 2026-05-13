@@ -10,7 +10,7 @@ import CreateTripDialog from '../components/trip/CreateTripDialog';
 export default function Dashboard() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const { trips, loading } = useUserTrips();
-    const { user } = useAuth();
+    const { user, isGlobalAdmin } = useAuth();
     const navigate = useNavigate();
 
     if (loading) {
@@ -34,13 +34,15 @@ export default function Dashboard() {
                         </h2>
                     </div>
 
-                    <Button
-                        onClick={() => setIsCreateOpen(true)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white h-11 px-6 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-900/20"
-                    >
-                        <Plus className="mr-2 h-3.5 w-3.5" />
-                        Novo Projeto
-                    </Button>
+                    {isGlobalAdmin && (
+                        <Button
+                            onClick={() => setIsCreateOpen(true)}
+                            className="bg-blue-600 hover:bg-blue-500 text-white h-11 px-6 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-900/20"
+                        >
+                            <Plus className="mr-2 h-3.5 w-3.5" />
+                            Novo Projeto
+                        </Button>
+                    )}
                 </div>
 
                 {/* Seção de Viagens */}

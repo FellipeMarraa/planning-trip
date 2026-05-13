@@ -13,7 +13,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Lista de e-mails que são ADM_GLOBAL (Root)
-const GLOBAL_ADMIN_EMAILS = ['seu-email@gmail.com'];
+const GLOBAL_ADMIN_EMAILS = ['fellipemarra.fm@gmail.com'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
