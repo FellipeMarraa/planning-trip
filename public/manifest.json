@@ -1,6 +1,6 @@
 {
-  "short_name": "TripVision",
-  "name": "TripVision Pro",
+  "short_name": "TripPlanner",
+  "name": "TripPlanner",
   "icons": [
     {
       "src": "/favicon.svg",
@@ -11,7 +11,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#0b1222",
-  "background_color": "#0b1222",
+  "theme_color": "#faf7f2",
+  "background_color": "#faf7f2",
   "orientation": "portrait"
 }

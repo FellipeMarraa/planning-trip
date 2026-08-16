@@ -124,15 +124,12 @@ export async function joinTripByInvite(tripId: string, role: string, uid: string
         throw new Error('Papel de convite inválido');
     }
 
-    const tripRef = doc(db, 'trips', tripId);
-    const tripSnap = await getDoc(tripRef);
-    if (!tripSnap.exists()) return;
-
-    const alreadyParticipant = (tripSnap.data().participants || []).includes(uid);
-    if (!alreadyParticipant) {
-        await updateDoc(tripRef, {
-            participants: arrayUnion(uid),
-            [`roles.${uid}`]: normalizedRole,
-        });
-    }
+    // Não faz getDoc antes: quem ainda não é participante não tem permissão de
+    // leitura em trips/{id} (regra do Firestore), então o getDoc seria negado
+    // e o convite nunca completaria. arrayUnion é idempotente, então dá pra
+    // escrever direto sem checar antes se já é participante.
+    await updateDoc(doc(db, 'trips', tripId), {
+        participants: arrayUnion(uid),
+        [`roles.${uid}`]: normalizedRole,
+    });
 }

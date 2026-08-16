@@ -1,13 +1,22 @@
 // src/App.tsx
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
 import Layout from './components/layout/Layout';
-import Dashboard from "@/pages/Dashboard.tsx";
-import TripDetails from "@/pages/TripDetails.tsx";
-import JoinTrip from "@/pages/JoinTrip.tsx";
-import TripItineraryPage from "@/pages/TripItineraryPage.tsx"; // Nova importação
+
+// Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
+// Motion de outras páginas antes de mostrar, por exemplo, a de convite).
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('@/pages/Dashboard.tsx'));
+const TripDetails = lazy(() => import('@/pages/TripDetails.tsx'));
+const JoinTrip = lazy(() => import('@/pages/JoinTrip.tsx'));
+const TripItineraryPage = lazy(() => import('@/pages/TripItineraryPage.tsx'));
+
+const PageLoader = () => (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+);
 
 const GlobalAdminPlaceholder = () => (
     <div className="space-y-2">
@@ -20,13 +29,7 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
     const { user, loading, isGlobalAdmin } = useAuth();
     const location = useLocation();
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
+    if (loading) return <PageLoader />;
 
     if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
 
@@ -58,6 +61,7 @@ export default function App() {
     return (
         <AuthProvider>
             <Router>
+                <Suspense fallback={<PageLoader />}>
                 <Routes>
                     {/* Rota de Login */}
                     <Route path="/login" element={
@@ -104,6 +108,7 @@ export default function App() {
                     {/* Fallback para Dashboard */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
+                </Suspense>
             </Router>
         </AuthProvider>
     );
