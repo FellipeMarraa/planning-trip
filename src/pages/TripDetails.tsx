@@ -6,7 +6,7 @@ import { useExchange } from '@/hooks/useExchange';
 import { useTripRole } from '@/hooks/useTripRole';
 import { useSettlements } from '@/hooks/useSettlements';
 import { useTripBalances } from '@/hooks/useTripBalances';
-import { addGhostMember, changeMemberRole, deleteTripCascade, linkGhostToUser, removeMember } from '@/services/trips';
+import { addGhostMember, changeMemberRole, deleteTripCascade, linkGhostToUser, removeMember, renameGhostMember } from '@/services/trips';
 import { deleteExpense } from '@/services/expenses';
 import { createSettlement, deleteSettlement } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,13 @@ import { LinkGhostModal } from "@/components/trip/LinkGhostModal";
 import { BalancesSummary } from "@/components/trip/BalancesSummary";
 import { MemberDebtModal } from "@/components/trip/MemberDebtModal";
 import { ExpenseFilters } from "@/components/trip/ExpenseFilters";
-import { ExpenseTable } from "@/components/trip/ExpenseTable";
+import { ExpenseTable, type ExpenseSortKey, type SortDirection } from "@/components/trip/ExpenseTable";
 import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsModal";
 import {
     Calendar,
     Map,
     MoreHorizontal,
+    Pencil,
     Plus,
     Share2,
     ShieldAlert,
@@ -48,7 +49,9 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AddExpenseDialog from '@/components/trip/AddExpenseDialog';
+import EditTripDialog from '@/components/trip/EditTripDialog';
 import TripAnalytics from '@/components/trip/TripAnalytics';
+import { formatDateBR } from '@/lib/dates';
 import type { Expense, UserRole } from '@/types';
 
 export default function TripDetails() {
@@ -60,9 +63,13 @@ export default function TripDetails() {
     const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
     const [expenseToView, setExpenseToView] = useState<Expense | null>(null);
     const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
+    const [isEditTripOpen, setIsEditTripOpen] = useState(false);
 
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterCurrency, setFilterCurrency] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortKey, setSortKey] = useState<ExpenseSortKey | null>(null);
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 8;
 
@@ -76,12 +83,25 @@ export default function TripDetails() {
     const balances = useTripBalances(trip?.participants || [], expenses, settlements);
 
     const filteredExpenses = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
         return expenses.filter(expense => {
             const matchCategory = filterCategory === 'all' || expense.category === filterCategory;
             const matchCurrency = filterCurrency === 'all' || expense.currency === filterCurrency;
-            return matchCategory && matchCurrency;
+            const matchSearch = query === '' || expense.description.toLowerCase().includes(query);
+            return matchCategory && matchCurrency && matchSearch;
         });
-    }, [expenses, filterCategory, filterCurrency]);
+    }, [expenses, filterCategory, filterCurrency, searchQuery]);
+
+    const sortedExpenses = useMemo(() => {
+        if (!sortKey) return filteredExpenses;
+        const sorted = [...filteredExpenses].sort((a, b) => {
+            const aValue = a[sortKey];
+            const bValue = b[sortKey];
+            if (typeof aValue === 'number' && typeof bValue === 'number') return aValue - bValue;
+            return String(aValue).localeCompare(String(bValue), 'pt-BR');
+        });
+        return sortDirection === 'asc' ? sorted : sorted.reverse();
+    }, [filteredExpenses, sortKey, sortDirection]);
 
     const categories = useMemo(() => {
         const set = new Set(expenses.map(e => e.category));
@@ -101,8 +121,8 @@ export default function TripDetails() {
 
     const variacao = totalBRLRealizado > 0 ? ((totalBRLMercado / totalBRLRealizado - 1) * 100) : 0;
 
-    const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage);
-    const paginatedExpenses = filteredExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const totalPages = Math.ceil(sortedExpenses.length / itemsPerPage);
+    const paginatedExpenses = sortedExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     if (loading) return null;
 
@@ -125,7 +145,17 @@ export default function TripDetails() {
     const resetFilters = () => {
         setFilterCategory('all');
         setFilterCurrency('all');
+        setSearchQuery('');
         setCurrentPage(1);
+    };
+
+    const handleSort = (key: ExpenseSortKey) => {
+        if (sortKey === key) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDirection('asc');
+        }
     };
 
     const copyInviteLink = (role: 'editor' | 'viewer') => {
@@ -155,6 +185,13 @@ export default function TripDetails() {
         } catch (error) { console.error("Erro ao adicionar convidado:", error); }
     };
 
+    const handleRenameGhost = async (ghostUid: string, name: string) => {
+        if (!tripId) return;
+        try {
+            await renameGhostMember(tripId, ghostUid, name);
+        } catch (error) { console.error("Erro ao renomear convidado:", error); }
+    };
+
     const handleLinkGhost = async (ghostUid: string, realUid: string) => {
         if (!tripId) return;
         try {
@@ -176,12 +213,6 @@ export default function TripDetails() {
         } catch (error) { console.error("Erro ao excluir acerto:", error); }
     };
 
-    const formatDate = (dateStr: string | undefined) => {
-        if (!dateStr) return '--/--/----';
-        const [year, month, day] = dateStr.split('-');
-        return `${day}/${month}/${year}`;
-    };
-
     return (
         <div className="w-full pb-16 space-y-7">
             <div className="flex items-center justify-between">
@@ -200,6 +231,9 @@ export default function TripDetails() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel>Gerenciar viagem</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => setIsEditTripOpen(true)}>
+                                <Pencil className="w-4 h-4 mr-2 text-primary" /> Editar viagem
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => copyInviteLink('editor')}>
                                 <Share2 className="w-4 h-4 mr-2 text-primary" /> Convidar editor
                             </DropdownMenuItem>
@@ -229,7 +263,7 @@ export default function TripDetails() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="w-4 h-4" />
-                        {formatDate(trip?.startDate)} — {formatDate(trip?.endDate)}
+                        {formatDateBR(trip?.startDate)} — {formatDateBR(trip?.endDate)}
                     </div>
                 </div>
                 {canEdit && (
@@ -250,6 +284,7 @@ export default function TripDetails() {
                     onRemoveMember={handleRemoveMember}
                     onAddGhost={handleAddGhost}
                     onLinkGhost={setGhostToLink}
+                    onRenameGhost={handleRenameGhost}
                 />
             )}
 
@@ -290,8 +325,10 @@ export default function TripDetails() {
                 categories={categories}
                 filterCategory={filterCategory}
                 filterCurrency={filterCurrency}
+                searchQuery={searchQuery}
                 onCategoryChange={(v) => { setFilterCategory(v); setCurrentPage(1); }}
                 onCurrencyChange={(v) => { setFilterCurrency(v); setCurrentPage(1); }}
+                onSearchChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
                 onReset={resetFilters}
             />
 
@@ -299,11 +336,14 @@ export default function TripDetails() {
                 <ExpenseTable
                     trip={trip}
                     expenses={paginatedExpenses}
-                    totalCount={filteredExpenses.length}
+                    totalCount={sortedExpenses.length}
                     canEdit={canEdit}
                     currentPage={currentPage}
                     totalPages={totalPages}
                     currentRates={currentRates}
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
                     onPageChange={setCurrentPage}
                     onEdit={(expense) => { setExpenseToEdit(expense); setIsAddExpenseOpen(true); }}
                     onDelete={setExpenseToDelete}
@@ -326,6 +366,14 @@ export default function TripDetails() {
                     onOpenChange={setIsAddExpenseOpen}
                     trip={trip}
                     expenseToEdit={expenseToEdit}
+                />
+            )}
+
+            {trip && (
+                <EditTripDialog
+                    open={isEditTripOpen}
+                    onOpenChange={setIsEditTripOpen}
+                    trip={trip}
                 />
             )}
 

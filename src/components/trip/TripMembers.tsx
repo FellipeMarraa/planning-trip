@@ -13,7 +13,7 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Eye, Link2, MoreHorizontal, Pencil, Plus, User as UserIcon, Users as UsersIcon, UserX } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Eye, Link2, MoreHorizontal, Pencil, Plus, User as UserIcon, Users as UsersIcon, UserX, X } from "lucide-react";
 import type { Trip, UserRole } from '@/types';
 
 interface TripMembersProps {
@@ -23,15 +23,18 @@ interface TripMembersProps {
     onRemoveMember: (uid: string) => void;
     onAddGhost: (name: string) => void;
     onLinkGhost: (ghostUid: string) => void;
+    onRenameGhost: (ghostUid: string, name: string) => void;
 }
 
 const MEMBERS_PER_PAGE = 4;
 
-export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost }: TripMembersProps) {
+export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost, onRenameGhost }: TripMembersProps) {
     const participants = trip.participants || [];
     const profiles = useUserProfiles(participants.filter((uid) => !isGhostUid(uid)));
     const [ghostName, setGhostName] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [editingGhostUid, setEditingGhostUid] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
 
     const totalPages = Math.max(1, Math.ceil(participants.length / MEMBERS_PER_PAGE));
     const page = Math.min(currentPage, totalPages);
@@ -42,6 +45,18 @@ export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAdd
         if (!ghostName.trim()) return;
         onAddGhost(ghostName.trim());
         setGhostName('');
+    };
+
+    const startEditingGhost = (uid: string, currentName: string) => {
+        setEditingGhostUid(uid);
+        setEditingName(currentName);
+    };
+
+    const handleSaveGhostName = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingGhostUid || !editingName.trim()) return;
+        onRenameGhost(editingGhostUid, editingName.trim());
+        setEditingGhostUid(null);
     };
 
     return (
@@ -55,27 +70,46 @@ export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAdd
                     const name = getMemberName(uid, trip, profiles);
                     const photoURL = !isGhost ? profiles[uid]?.photoURL : undefined;
 
+                    const isEditingName = editingGhostUid === uid;
+
                     return (
                         <div key={uid} className="flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-muted/40">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-7 h-7 rounded-full border border-border bg-muted overflow-hidden flex-shrink-0">
-                                    {photoURL ? (
-                                        <img src={photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                                        </div>
-                                    )}
+                            {isEditingName ? (
+                                <form onSubmit={handleSaveGhostName} className="flex items-center gap-2 min-w-0 flex-1">
+                                    <Input
+                                        autoFocus
+                                        className="h-8"
+                                        value={editingName}
+                                        onChange={(e) => setEditingName(e.target.value)}
+                                    />
+                                    <button type="submit" className="p-1 text-primary hover:text-primary/80 flex-shrink-0" aria-label="Salvar nome">
+                                        <Check className="w-4 h-4" />
+                                    </button>
+                                    <button type="button" onClick={() => setEditingGhostUid(null)} className="p-1 text-muted-foreground hover:text-foreground flex-shrink-0" aria-label="Cancelar">
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </form>
+                            ) : (
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-7 h-7 rounded-full border border-border bg-muted overflow-hidden flex-shrink-0">
+                                        {photoURL ? (
+                                            <img src={photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <span className="text-sm text-foreground truncate">{name}</span>
                                 </div>
-                                <span className="text-sm text-foreground truncate">{name}</span>
-                            </div>
+                            )}
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 {isGhost ? (
                                     <Badge variant="outline" className="font-medium">Convidado</Badge>
                                 ) : (
                                     <RoleBadge role={memberRole} />
                                 )}
-                                {canEdit && (isGhost || !isMemberOwner) && (
+                                {canEdit && !isEditingName && (isGhost || !isMemberOwner) && (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <button className="p-1 text-muted-foreground hover:text-foreground transition-colors outline-none">
@@ -84,9 +118,14 @@ export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAdd
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             {isGhost ? (
-                                                <DropdownMenuItem onClick={() => onLinkGhost(uid)}>
-                                                    <Link2 className="mr-2 h-3.5 w-3.5" /> Vincular a um usuário
-                                                </DropdownMenuItem>
+                                                <>
+                                                    <DropdownMenuItem onClick={() => startEditingGhost(uid, name)}>
+                                                        <Pencil className="mr-2 h-3.5 w-3.5" /> Editar nome
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => onLinkGhost(uid)}>
+                                                        <Link2 className="mr-2 h-3.5 w-3.5" /> Vincular a um usuário
+                                                    </DropdownMenuItem>
+                                                </>
                                             ) : (
                                                 <>
                                                     {memberRole !== 'EDITOR' && (

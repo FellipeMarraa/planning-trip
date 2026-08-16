@@ -39,6 +39,26 @@ export async function createTrip(input: CreateTripInput) {
     });
 }
 
+interface UpdateTripInput {
+    name: string;
+    startDate: string;
+    endDate: string;
+}
+
+export async function updateTripDetails(tripId: string, input: UpdateTripInput) {
+    await updateDoc(doc(db, 'trips', tripId), {
+        name: input.name,
+        startDate: input.startDate,
+        endDate: input.endDate,
+    });
+}
+
+export async function renameGhostMember(tripId: string, ghostUid: string, name: string) {
+    await updateDoc(doc(db, 'trips', tripId), {
+        [`ghosts.${ghostUid}.name`]: name,
+    });
+}
+
 export async function deleteTripCascade(tripId: string) {
     const batch = writeBatch(db);
     const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('tripId', '==', tripId)));

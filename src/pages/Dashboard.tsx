@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { ArrowRight, Calendar, Plane, Plus, Users } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import CreateTripDialog from '../components/trip/CreateTripDialog';
+import { formatDateBR } from '@/lib/dates';
 
 export default function Dashboard() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -68,7 +69,7 @@ export default function Dashboard() {
                                     <div className="pt-4 flex items-center justify-between border-t border-border">
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <Calendar className="w-3.5 h-3.5" />
-                                            {new Date(trip.startDate).toLocaleDateString('pt-BR')} — {new Date(trip.endDate).toLocaleDateString('pt-BR')}
+                                            {formatDateBR(trip.startDate)} — {formatDateBR(trip.endDate)}
                                         </div>
 
                                         <div className="w-7 h-7 rounded-full border border-border bg-muted flex items-center justify-center text-muted-foreground">

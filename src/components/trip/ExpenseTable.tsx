@@ -5,8 +5,12 @@ import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { getMemberName, isGhostUid } from "@/lib/members";
-import { ChevronLeft, ChevronRight, Pencil, Trash2, Users, Wallet } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Trash2, Users, Wallet } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Expense, Trip } from '@/types';
+
+export type ExpenseSortKey = 'description' | 'category' | 'amountOriginal' | 'amountBRL';
+export type SortDirection = 'asc' | 'desc';
 
 interface ExpenseTableProps {
     trip: Trip;
@@ -16,6 +20,9 @@ interface ExpenseTableProps {
     currentPage: number;
     totalPages: number;
     currentRates: Record<string, number>;
+    sortKey: ExpenseSortKey | null;
+    sortDirection: SortDirection;
+    onSort: (key: ExpenseSortKey) => void;
     onPageChange: (page: number) => void;
     onEdit: (expense: Expense) => void;
     onDelete: (expense: Expense) => void;
@@ -25,8 +32,25 @@ interface ExpenseTableProps {
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseTable({ trip, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
+export function ExpenseTable({ trip, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
     const profiles = useUserProfiles((trip.participants || []).filter((uid) => !isGhostUid(uid)));
+
+    const SortableHeader = ({ column, label, align }: { column: ExpenseSortKey; label: string; align?: 'right' }) => (
+        <th className={cn("px-6 py-3 font-medium", align === 'right' && "text-right")}>
+            <button
+                type="button"
+                onClick={() => onSort(column)}
+                className={cn("flex items-center gap-1 hover:text-foreground transition-colors", align === 'right' && "ml-auto")}
+            >
+                {label}
+                {sortKey === column ? (
+                    sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                ) : (
+                    <ChevronDown className="w-3 h-3 opacity-30" />
+                )}
+            </button>
+        </th>
+    );
 
     return (
         <div className="bg-card border border-border rounded-3xl overflow-hidden">
@@ -38,11 +62,11 @@ export function ExpenseTable({ trip, expenses, totalCount, canEdit, currentPage,
                 <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                     <tr className="text-xs text-muted-foreground border-b border-border">
-                        <th className="px-6 py-3 font-medium">Descrição</th>
-                        <th className="px-6 py-3 font-medium">Categoria</th>
+                        <SortableHeader column="description" label="Descrição" />
+                        <SortableHeader column="category" label="Categoria" />
                         <th className="px-6 py-3 font-medium">Pago por</th>
-                        <th className="px-6 py-3 font-medium text-right">Origem</th>
-                        <th className="px-6 py-3 font-medium text-right text-foreground">Total (BRL)</th>
+                        <SortableHeader column="amountOriginal" label="Origem" align="right" />
+                        <SortableHeader column="amountBRL" label="Total (BRL)" align="right" />
                         <th className="px-6 py-3 text-right font-medium">Ações</th>
                     </tr>
                     </thead>
