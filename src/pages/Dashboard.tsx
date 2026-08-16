@@ -5,10 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
-import { ArrowRight, Calendar, Plane, Plus, Users } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Plane, Plus } from "lucide-react";
 import { useNavigate } from 'react-router-dom';
 import CreateTripDialog from '../components/trip/CreateTripDialog';
-import { formatDateBR } from '@/lib/dates';
+import { formatDateBR, getTripCountdown } from '@/lib/dates';
+import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -50,40 +51,54 @@ export default function Dashboard() {
                     {trips.length === 0 ? (
                         <EmptyState icon={Plane} message="Você ainda não tem nenhuma viagem" className="col-span-full" />
                     ) : (
-                        trips.map((trip) => (
-                            <div
-                                key={trip.id}
-                                onClick={() => navigate(`/trip/${trip.id}`)}
-                                className="group relative bg-card border border-border rounded-3xl p-6 hover:border-primary/40 hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[190px]"
-                            >
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-start">
-                                        <h3 className="text-lg font-semibold text-foreground tracking-tight group-hover:text-primary transition-colors">
-                                            {trip.name}
-                                        </h3>
-                                        <div className="p-2.5 bg-muted rounded-xl group-hover:bg-primary/10 transition-colors">
-                                            <Plane className="w-4 h-4 text-muted-foreground group-hover:text-primary -rotate-45 transition-colors" />
+                        trips.map((trip) => {
+                            const { durationDays, status, daysUntilStart } = getTripCountdown(trip.startDate, trip.endDate);
+                            const countdownLabel = status === 'finished'
+                                ? 'Finalizada'
+                                : status === 'ongoing'
+                                    ? 'Em andamento'
+                                    : `Faltam ${daysUntilStart} dia${daysUntilStart === 1 ? '' : 's'}`;
+
+                            return (
+                                <div
+                                    key={trip.id}
+                                    onClick={() => navigate(`/trip/${trip.id}`)}
+                                    className="group relative bg-card border border-border rounded-3xl p-6 hover:border-primary/40 hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[190px]"
+                                >
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="text-lg font-semibold text-foreground tracking-tight group-hover:text-primary transition-colors">
+                                                {trip.name}
+                                            </h3>
+                                            <div className="p-2.5 bg-muted rounded-xl group-hover:bg-primary/10 transition-colors">
+                                                <Plane className="w-4 h-4 text-muted-foreground group-hover:text-primary -rotate-45 transition-colors" />
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 space-y-2 border-t border-border">
+                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Calendar className="w-3.5 h-3.5" />
+                                                {formatDateBR(trip.startDate)} — {formatDateBR(trip.endDate)}
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-muted-foreground">{durationDays} dia{durationDays === 1 ? '' : 's'} de viagem</span>
+                                                <span className={cn(
+                                                    "flex items-center gap-1 font-medium",
+                                                    status === 'ongoing' ? "text-primary" : status === 'finished' ? "text-muted-foreground/60" : "text-muted-foreground"
+                                                )}>
+                                                    <Clock className="w-3 h-3" /> {countdownLabel}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="pt-4 flex items-center justify-between border-t border-border">
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Calendar className="w-3.5 h-3.5" />
-                                            {formatDateBR(trip.startDate)} — {formatDateBR(trip.endDate)}
-                                        </div>
-
-                                        <div className="w-7 h-7 rounded-full border border-border bg-muted flex items-center justify-center text-muted-foreground">
-                                            <Users className="w-3 h-3" />
-                                        </div>
+                                    <div className="mt-5 flex items-center justify-between opacity-70 group-hover:opacity-100 transition-opacity">
+                                        <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Ver detalhes</span>
+                                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                                     </div>
                                 </div>
-
-                                <div className="mt-5 flex items-center justify-between opacity-70 group-hover:opacity-100 transition-opacity">
-                                    <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">Ver detalhes</span>
-                                    <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>

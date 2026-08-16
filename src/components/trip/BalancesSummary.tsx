@@ -21,7 +21,7 @@ export function BalancesSummary({ trip, balances, onSelectMember }: BalancesSumm
     return (
         <div className="bg-card border border-border rounded-3xl p-6">
             <SectionHeader icon={Scale} className="mb-4">Divisão de gastos</SectionHeader>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {participants.map((uid) => {
                     const balance = balances[uid] || 0;
                     const isCredit = balance > 0.01;
@@ -31,10 +31,10 @@ export function BalancesSummary({ trip, balances, onSelectMember }: BalancesSumm
                         <button
                             key={uid}
                             onClick={() => onSelectMember(uid)}
-                            className="text-left p-4 rounded-2xl bg-muted/40 border border-border hover:border-primary/30 transition-colors"
+                            className="min-w-0 text-left p-4 rounded-2xl bg-muted/40 border border-border hover:border-primary/30 transition-colors"
                         >
                             <p className="text-sm text-foreground truncate mb-1">{getMemberName(uid, trip, profiles)}</p>
-                            <p className={`text-lg font-semibold tabular-nums ${isCredit ? 'text-chart-2' : isDebt ? 'text-destructive' : 'text-muted-foreground'}`}>
+                            <p className={`text-lg font-semibold tabular-nums truncate ${isCredit ? 'text-chart-2' : isDebt ? 'text-destructive' : 'text-muted-foreground'}`}>
                                 {isDebt ? '-' : isCredit ? '+' : ''}{formatBRL(balance)}
                             </p>
                             <p className="text-xs text-muted-foreground mt-0.5">
