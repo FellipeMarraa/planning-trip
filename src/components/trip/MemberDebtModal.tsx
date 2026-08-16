@@ -20,6 +20,18 @@ interface MemberDebtModalProps {
     canEdit: boolean;
 }
 
+interface DebtItem {
+    expenseId: string;
+    description: string;
+    share: number;
+}
+
+interface DebtGroup {
+    uid: string;
+    total: number;
+    items: DebtItem[];
+}
+
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
@@ -33,33 +45,40 @@ export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses,
     );
 
     const { debts, credits } = useMemo(() => {
-        if (!memberUid) return { debts: [] as [string, number][], credits: [] as [string, number][] };
+        if (!memberUid) return { debts: [] as DebtGroup[], credits: [] as DebtGroup[] };
 
-        const owed: Record<string, number> = {};
-        const owedToMe: Record<string, number> = {};
+        const owed: Record<string, DebtGroup> = {};
+        const owedToMe: Record<string, DebtGroup> = {};
 
         expenses.forEach((exp) => {
             const participants = exp.participants || [];
-            const share = (Number(exp.amountBRL) || 0) / (participants.length || 1);
             if (!participants.includes(memberUid)) return;
+            const share = (Number(exp.amountBRL) || 0) / (participants.length || 1);
+            const item = { expenseId: exp.id, description: exp.description, share };
 
             if (exp.paidBy === memberUid) {
                 participants.forEach((uid) => {
-                    if (uid !== memberUid) owedToMe[uid] = (owedToMe[uid] || 0) + share;
+                    if (uid === memberUid) return;
+                    if (!owedToMe[uid]) owedToMe[uid] = { uid, total: 0, items: [] };
+                    owedToMe[uid].total += share;
+                    owedToMe[uid].items.push(item);
                 });
             } else {
-                owed[exp.paidBy] = (owed[exp.paidBy] || 0) + share;
+                const payer = exp.paidBy;
+                if (!owed[payer]) owed[payer] = { uid: payer, total: 0, items: [] };
+                owed[payer].total += share;
+                owed[payer].items.push(item);
             }
         });
 
         settlements.forEach((s) => {
-            if (s.from === memberUid && owed[s.to] !== undefined) owed[s.to] -= s.amount;
-            if (s.to === memberUid && owedToMe[s.from] !== undefined) owedToMe[s.from] -= s.amount;
+            if (s.from === memberUid && owed[s.to]) owed[s.to].total -= s.amount;
+            if (s.to === memberUid && owedToMe[s.from]) owedToMe[s.from].total -= s.amount;
         });
 
         return {
-            debts: Object.entries(owed).filter(([, amount]) => amount > 0.01),
-            credits: Object.entries(owedToMe).filter(([, amount]) => amount > 0.01),
+            debts: Object.values(owed).filter((g) => g.total > 0.01),
+            credits: Object.values(owedToMe).filter((g) => g.total > 0.01),
         };
     }, [memberUid, expenses, settlements]);
 
@@ -84,18 +103,28 @@ export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses,
                         {debts.length === 0 ? (
                             <p className="text-sm text-muted-foreground">Nenhuma dívida pendente.</p>
                         ) : (
-                            <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-none">
-                                {debts.map(([creditorUid, amount]) => (
-                                    <div key={creditorUid} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40">
-                                        <div>
-                                            <p className="text-sm text-foreground">{getMemberName(creditorUid, trip, profiles)}</p>
-                                            <p className="text-sm font-semibold text-destructive tabular-nums">{formatBRL(amount)}</p>
+                            <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-none">
+                                {debts.map((group) => (
+                                    <div key={group.uid} className="p-3 rounded-xl bg-muted/40 space-y-2">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm text-foreground">{getMemberName(group.uid, trip, profiles)}</p>
+                                                <p className="text-sm font-semibold text-destructive tabular-nums">{formatBRL(group.total)}</p>
+                                            </div>
+                                            {user?.uid === group.uid && (
+                                                <Button size="sm" variant="outline" onClick={() => onSettle(memberUid, group.uid, group.total)}>
+                                                    Marquei como recebido
+                                                </Button>
+                                            )}
                                         </div>
-                                        {user?.uid === creditorUid && (
-                                            <Button size="sm" variant="outline" onClick={() => onSettle(memberUid, creditorUid, amount)}>
-                                                Marquei como recebido
-                                            </Button>
-                                        )}
+                                        <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-none">
+                                            {group.items.map((item, idx) => (
+                                                <div key={`${item.expenseId}-${idx}`} className="flex items-center justify-between gap-2 text-xs text-muted-foreground pl-1 border-l-2 border-border">
+                                                    <span className="truncate pl-2">{item.description}</span>
+                                                    <span className="tabular-nums flex-shrink-0">{formatBRL(item.share)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -107,18 +136,28 @@ export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses,
                         {credits.length === 0 ? (
                             <p className="text-sm text-muted-foreground">Ninguém deve para este membro.</p>
                         ) : (
-                            <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-none">
-                                {credits.map(([debtorUid, amount]) => (
-                                    <div key={debtorUid} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40">
-                                        <div>
-                                            <p className="text-sm text-foreground">{getMemberName(debtorUid, trip, profiles)}</p>
-                                            <p className="text-sm font-semibold text-chart-2 tabular-nums">{formatBRL(amount)}</p>
+                            <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-none">
+                                {credits.map((group) => (
+                                    <div key={group.uid} className="p-3 rounded-xl bg-muted/40 space-y-2">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm text-foreground">{getMemberName(group.uid, trip, profiles)}</p>
+                                                <p className="text-sm font-semibold text-chart-2 tabular-nums">{formatBRL(group.total)}</p>
+                                            </div>
+                                            {user?.uid === memberUid && (
+                                                <Button size="sm" variant="outline" onClick={() => onSettle(group.uid, memberUid, group.total)}>
+                                                    Marquei como recebido
+                                                </Button>
+                                            )}
                                         </div>
-                                        {user?.uid === memberUid && (
-                                            <Button size="sm" variant="outline" onClick={() => onSettle(debtorUid, memberUid, amount)}>
-                                                Marquei como recebido
-                                            </Button>
-                                        )}
+                                        <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-none">
+                                            {group.items.map((item, idx) => (
+                                                <div key={`${item.expenseId}-${idx}`} className="flex items-center justify-between gap-2 text-xs text-muted-foreground pl-1 border-l-2 border-border">
+                                                    <span className="truncate pl-2">{item.description}</span>
+                                                    <span className="tabular-nums flex-shrink-0">{formatBRL(item.share)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
