@@ -1,7 +1,7 @@
 // src/hooks/useActivities.ts
 import { useState, useEffect } from 'react';
 import { db } from '@/config/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import type { Activity } from '@/types';
 
 export function useActivities(tripId: string) {
@@ -14,7 +14,8 @@ export function useActivities(tripId: string) {
         const q = query(
             collection(db, 'activities'),
             where('tripId', '==', tripId),
-            orderBy('time', 'asc')
+            orderBy('time', 'asc'),
+            limit(1000)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

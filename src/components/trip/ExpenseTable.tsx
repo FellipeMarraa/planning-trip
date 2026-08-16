@@ -3,17 +3,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
-import { getMemberName, isGhostUid } from "@/lib/members";
+import { getMemberName } from "@/lib/members";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Trash2, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Expense, Trip } from '@/types';
+import type { Expense, Trip, UserProfile } from '@/types';
 
 export type ExpenseSortKey = 'description' | 'category' | 'amountOriginal' | 'amountBRL';
 export type SortDirection = 'asc' | 'desc';
 
 interface ExpenseTableProps {
     trip: Trip;
+    profiles: Record<string, UserProfile>;
     expenses: Expense[];
     totalCount: number;
     canEdit: boolean;
@@ -32,9 +32,7 @@ interface ExpenseTableProps {
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseTable({ trip, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
-    const profiles = useUserProfiles((trip.participants || []).filter((uid) => !isGhostUid(uid)));
-
+export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
     const SortableHeader = ({ column, label, align }: { column: ExpenseSortKey; label: string; align?: 'right' }) => (
         <th className={cn("px-6 py-3 font-medium", align === 'right' && "text-right")}>
             <button

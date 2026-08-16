@@ -1,7 +1,8 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import {auth} from '../config/firebase';
-import {GoogleAuthProvider, getRedirectResult, signInWithRedirect, signOut, type User} from 'firebase/auth';
+import {GoogleAuthProvider, signInWithPopup, signOut, type User} from 'firebase/auth';
 import {upsertUserProfile} from '../services/users';
+import {useToast} from './ToastContext';
 
 interface AuthContextType {
     user: User | null;
@@ -19,26 +20,31 @@ const GLOBAL_ADMIN_EMAILS = ['fellipemarra.fm@gmail.com'];
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const { showError } = useToast();
 
     const isGlobalAdmin = user ? GLOBAL_ADMIN_EMAILS.includes(user.email || '') : false;
 
     const loginWithGoogle = async () => {
-        // Redirect em vez de popup: popups são bloqueados/pouco confiáveis em
-        // navegadores mobile e dentro de webviews de apps (WhatsApp, Instagram).
+        // Popup em vez de redirect: o redirect quebra em Safari 16.1+/Chrome 115+/
+        // Firefox 109+ porque authDomain (firebaseapp.com) é domínio diferente do
+        // app (vercel.app) e esses navegadores bloqueiam storage entre domínios
+        // durante a ida-e-volta — o usuário volta pro login sem nunca autenticar.
+        // Corrigir isso via redirect exigiria domínio customizado + proxy, fora de
+        // escopo agora. Popup não depende desse bridge entre domínios.
+        // Ainda falha dentro de webviews de apps (WhatsApp, Instagram) — tratado
+        // separadamente pelo aviso em Login.tsx (isInAppBrowser).
         const provider = new GoogleAuthProvider();
         try {
-            await signInWithRedirect(auth, provider);
+            await signInWithPopup(auth, provider);
         } catch (error) {
             console.error("Erro ao fazer login:", error);
+            showError("Não foi possível fazer login. Tente novamente.");
         }
     };
 
     const logout = () => signOut(auth);
 
     useEffect(() => {
-        // Processa o retorno do signInWithRedirect (a página recarrega ao voltar do Google).
-        getRedirectResult(auth).catch((error) => console.error("Erro ao concluir login:", error));
-
         const unsubscribe = auth.onAuthStateChanged((user) => {
             setUser(user);
             setLoading(false);
@@ -47,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         });
         return unsubscribe;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

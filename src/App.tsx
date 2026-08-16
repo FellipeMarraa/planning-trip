@@ -2,6 +2,7 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import Layout from './components/layout/Layout';
 import { consumePostLoginRedirect, savePostLoginRedirect } from './lib/postLoginRedirect';
 
@@ -61,6 +62,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
     return (
+        <ToastProvider>
         <AuthProvider>
             <Router>
                 <Suspense fallback={<PageLoader />}>
@@ -113,5 +115,6 @@ export default function App() {
                 </Suspense>
             </Router>
         </AuthProvider>
+        </ToastProvider>
     );
 }

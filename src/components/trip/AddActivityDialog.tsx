@@ -1,6 +1,7 @@
 // src/components/trip/AddActivityDialog.tsx
 import { useState } from 'react';
 import { createActivity } from '@/services/activities';
+import { useToast } from '@/context/ToastContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ interface AddActivityDialogProps {
 }
 
 export default function AddActivityDialog({ open, onOpenChange, tripId, dateId }: AddActivityDialogProps) {
+    const { showError } = useToast();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         time: '',
@@ -34,6 +36,7 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId }
             onOpenChange(false);
         } catch (error) {
             console.error("Erro ao salvar atividade:", error);
+            showError("Não foi possível salvar a atividade. Tente novamente.");
         } finally {
             setLoading(false);
         }

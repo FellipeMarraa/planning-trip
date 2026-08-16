@@ -3,10 +3,12 @@ import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { joinTripByInvite } from '@/services/trips';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 export default function JoinTrip() {
     const { tripId, role } = useParams();
     const { user } = useAuth();
+    const { showError } = useToast();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -17,13 +19,15 @@ export default function JoinTrip() {
                 await joinTripByInvite(tripId, role, user.uid);
                 navigate(`/trip/${tripId}`);
             } catch (error) {
+                const code = (error as { code?: string })?.code || 'desconhecido';
                 console.error("Erro ao entrar na viagem:", error);
+                showError(`Não foi possível entrar na viagem (${code}). Peça um novo link de convite.`);
                 navigate('/');
             }
         };
 
         processJoin();
-    }, [user, tripId, role, navigate]);
+    }, [user, tripId, role, navigate, showError]);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background">

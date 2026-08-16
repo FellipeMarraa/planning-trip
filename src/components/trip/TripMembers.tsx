@@ -4,7 +4,6 @@ import { SectionHeader } from "@/components/common/section-header";
 import { RoleBadge } from "@/components/trip/role-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { getMemberName, isGhostUid } from "@/lib/members";
 import {
     DropdownMenu,
@@ -14,10 +13,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Check, ChevronLeft, ChevronRight, Eye, Link2, MoreHorizontal, Pencil, Plus, User as UserIcon, Users as UsersIcon, UserX, X } from "lucide-react";
-import type { Trip, UserRole } from '@/types';
+import type { Trip, UserProfile, UserRole } from '@/types';
 
 interface TripMembersProps {
     trip: Trip;
+    profiles: Record<string, UserProfile>;
     canEdit: boolean;
     onChangeRole: (uid: string, role: Exclude<UserRole, 'OWNER'>) => void;
     onRemoveMember: (uid: string) => void;
@@ -28,9 +28,8 @@ interface TripMembersProps {
 
 const MEMBERS_PER_PAGE = 4;
 
-export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost, onRenameGhost }: TripMembersProps) {
+export function TripMembers({ trip, profiles, canEdit, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost, onRenameGhost }: TripMembersProps) {
     const participants = trip.participants || [];
-    const profiles = useUserProfiles(participants.filter((uid) => !isGhostUid(uid)));
     const [ghostName, setGhostName] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [editingGhostUid, setEditingGhostUid] = useState<string | null>(null);
@@ -112,7 +111,7 @@ export function TripMembers({ trip, canEdit, onChangeRole, onRemoveMember, onAdd
                                 {canEdit && !isEditingName && (isGhost || !isMemberOwner) && (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <button className="p-1 text-muted-foreground hover:text-foreground transition-colors outline-none">
+                                            <button aria-label="Mais opções do membro" className="p-1 text-muted-foreground hover:text-foreground transition-colors outline-none">
                                                 <MoreHorizontal className="w-4 h-4" />
                                             </button>
                                         </DropdownMenuTrigger>

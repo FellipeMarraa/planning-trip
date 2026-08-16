@@ -8,28 +8,26 @@ import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/common/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, CreditCard, RotateCcw, Sparkles, Zap } from "lucide-react";
-import { useExchange } from "@/hooks/useExchange.ts";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { useAuth } from "@/context/AuthContext";
 import { getMemberName } from "@/lib/members";
 import { cn } from "@/lib/utils";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currencies";
 import { EXPENSE_CATEGORIES } from "@/lib/categories";
-import type { Expense, Trip } from '@/types';
+import type { Expense, Trip, UserProfile } from '@/types';
 
 interface AddExpenseDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     trip: Trip;
+    profiles: Record<string, UserProfile>;
+    rates: Record<string, number>;
     expenseToEdit?: Expense;
 }
 
 type CurrencyType = CurrencyCode;
 
-export default function AddExpenseDialog({ open, onOpenChange, trip, expenseToEdit }: AddExpenseDialogProps) {
-    const { rates: liveRates } = useExchange();
+export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, rates: liveRates, expenseToEdit }: AddExpenseDialogProps) {
     const { user } = useAuth();
-    const profiles = useUserProfiles(trip.participants || []);
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../config/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import type {Trip} from '@/types';
 
@@ -15,7 +15,8 @@ export const useUserTrips = () => {
         const q = query(
             collection(db, 'trips'),
             where('participants', 'array-contains', user.uid),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'desc'),
+            limit(200)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

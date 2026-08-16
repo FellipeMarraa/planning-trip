@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { createTrip } from '@/services/trips';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -31,6 +32,7 @@ type BaseCurrency = CurrencyCode;
 
 export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialogProps) {
     const { user } = useAuth();
+    const { showError } = useToast();
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -58,6 +60,7 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
             setFormData({ name: '', startDate: '', endDate: '', baseCurrency: 'EUR' });
         } catch (error) {
             console.error("Erro ao criar viagem:", error);
+            showError("Não foi possível criar a viagem. Tente novamente.");
         } finally {
             setLoading(false);
         }

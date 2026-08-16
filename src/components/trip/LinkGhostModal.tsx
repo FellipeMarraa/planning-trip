@@ -2,23 +2,22 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { getMemberName, isGhostUid } from "@/lib/members";
 import { cn } from "@/lib/utils";
 import { Link2 } from "lucide-react";
-import type { Trip } from '@/types';
+import type { Trip, UserProfile } from '@/types';
 
 interface LinkGhostModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     trip: Trip;
+    profiles: Record<string, UserProfile>;
     ghostUid: string | null;
     onConfirm: (ghostUid: string, realUid: string) => void;
 }
 
-export function LinkGhostModal({ open, onOpenChange, trip, ghostUid, onConfirm }: LinkGhostModalProps) {
+export function LinkGhostModal({ open, onOpenChange, trip, profiles, ghostUid, onConfirm }: LinkGhostModalProps) {
     const realParticipants = (trip.participants || []).filter((uid) => !isGhostUid(uid));
-    const profiles = useUserProfiles(realParticipants);
     const [selectedUid, setSelectedUid] = useState<string | null>(null);
 
     const ghostName = ghostUid ? getMemberName(ghostUid, trip, profiles) : '';

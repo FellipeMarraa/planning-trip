@@ -17,6 +17,19 @@ import {
 } from 'firebase/firestore';
 import type { UserRole } from '@/types';
 
+// Firestore limita cada writeBatch a 500 operações. Trips com mais despesas
+// do que isso quebrariam deleteTripCascade/linkGhostToUser inteiro (o batch
+// falha e nada é commitado). Reserva 1 slot pra operação no doc da trip.
+const BATCH_LIMIT = 499;
+
+function chunk<T>(items: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size));
+    }
+    return chunks.length > 0 ? chunks : [[]];
+}
+
 interface CreateTripInput {
     name: string;
     startDate: string;
@@ -60,11 +73,18 @@ export async function renameGhostMember(tripId: string, ghostUid: string, name: 
 }
 
 export async function deleteTripCascade(tripId: string) {
-    const batch = writeBatch(db);
     const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('tripId', '==', tripId)));
-    expensesSnap.forEach((d) => batch.delete(d.ref));
-    batch.delete(doc(db, 'trips', tripId));
-    await batch.commit();
+    const expenseRefs = expensesSnap.docs.map((d) => d.ref);
+    const batches = chunk(expenseRefs, BATCH_LIMIT);
+
+    for (let i = 0; i < batches.length; i++) {
+        const batch = writeBatch(db);
+        batches[i].forEach((ref) => batch.delete(ref));
+        if (i === batches.length - 1) {
+            batch.delete(doc(db, 'trips', tripId));
+        }
+        await batch.commit();
+    }
 }
 
 export async function changeMemberRole(tripId: string, uid: string, role: Exclude<UserRole, 'OWNER'>) {
@@ -89,6 +109,13 @@ export async function addGhostMember(tripId: string, name: string) {
 }
 
 export async function linkGhostToUser(tripId: string, ghostUid: string, realUid: string) {
+    // Nota: getDocs + writeBatch aqui não é atômico com escritas concorrentes —
+    // uma despesa criada para o ghostUid *entre* o getDocs e o commit não seria
+    // migrada (ficaria com o uid fantasma órfão). Janela mínima (sem await no
+    // meio), mas uma correção 100% atômica exigiria Cloud Function/transação no
+    // servidor, fora do escopo do plano Spark gratuito. Impacto se acontecer: a
+    // despesa some do participants/roles do fantasma, mas continua existindo —
+    // basta reeditar o "pago por" dela manualmente.
     const tripRef = doc(db, 'trips', tripId);
     const tripSnap = await getDoc(tripRef);
     if (!tripSnap.exists()) return;
@@ -97,25 +124,31 @@ export async function linkGhostToUser(tripId: string, ghostUid: string, realUid:
     const nextParticipants = Array.from(new Set(currentParticipants.filter((uid) => uid !== ghostUid)));
 
     const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('tripId', '==', tripId)));
-    const batch = writeBatch(db);
-
-    expensesSnap.forEach((expenseDoc) => {
+    const expensesToMigrate = expensesSnap.docs.filter((expenseDoc) => {
         const data = expenseDoc.data();
         const participants: string[] = data.participants || [];
-        if (data.paidBy !== ghostUid && !participants.includes(ghostUid)) return;
+        return data.paidBy === ghostUid || participants.includes(ghostUid);
+    });
+    const batches = chunk(expensesToMigrate, BATCH_LIMIT);
 
-        batch.update(expenseDoc.ref, {
-            paidBy: data.paidBy === ghostUid ? realUid : data.paidBy,
-            participants: participants.map((uid) => (uid === ghostUid ? realUid : uid)),
+    for (let i = 0; i < batches.length; i++) {
+        const batch = writeBatch(db);
+        batches[i].forEach((expenseDoc) => {
+            const data = expenseDoc.data();
+            const participants: string[] = data.participants || [];
+            batch.update(expenseDoc.ref, {
+                paidBy: data.paidBy === ghostUid ? realUid : data.paidBy,
+                participants: participants.map((uid) => (uid === ghostUid ? realUid : uid)),
+            });
         });
-    });
-
-    batch.update(tripRef, {
-        participants: nextParticipants,
-        [`ghosts.${ghostUid}`]: deleteField(),
-    });
-
-    await batch.commit();
+        if (i === batches.length - 1) {
+            batch.update(tripRef, {
+                participants: nextParticipants,
+                [`ghosts.${ghostUid}`]: deleteField(),
+            });
+        }
+        await batch.commit();
+    }
 }
 
 export async function joinTripByInvite(tripId: string, role: string, uid: string) {

@@ -2,11 +2,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { useTrip } from '@/hooks/useTrip';
 import { useExchange } from '@/hooks/useExchange';
 import { useTripRole } from '@/hooks/useTripRole';
 import { useSettlements } from '@/hooks/useSettlements';
 import { useTripBalances } from '@/hooks/useTripBalances';
+import { useUserProfiles } from '@/hooks/useUserProfiles';
+import { isGhostUid } from '@/lib/members';
 import { addGhostMember, changeMemberRole, deleteTripCascade, linkGhostToUser, removeMember, renameGhostMember } from '@/services/trips';
 import { deleteExpense } from '@/services/expenses';
 import { createSettlement, deleteSettlement } from '@/services/settlements';
@@ -78,11 +81,15 @@ export default function TripDetails() {
     const [memberToInspect, setMemberToInspect] = useState<string | null>(null);
 
     const { user } = useAuth();
-    const { trip, expenses, loading } = useTrip(tripId || '');
+    const { showError } = useToast();
+    const { trip, expenses, loading, error } = useTrip(tripId || '');
     const { rates: currentRates } = useExchange();
     const { canEdit } = useTripRole(trip);
     const { settlements } = useSettlements(tripId || '');
     const balances = useTripBalances(trip?.participants || [], expenses, settlements);
+    // Busca única dos perfis, compartilhada com todos os componentes da página
+    // (evita 6+ listeners independentes pros mesmos usuários).
+    const profiles = useUserProfiles((trip?.participants || []).filter((uid) => !isGhostUid(uid)));
 
     // Visualizador só vê despesas em que participou; owner/editor vê tudo.
     const visibleExpenses = useMemo(() => {
@@ -134,12 +141,27 @@ export default function TripDetails() {
 
     if (loading) return null;
 
+    if (error) {
+        return (
+            <div className="max-w-md mx-auto mt-20 text-center space-y-4">
+                <div className="w-12 h-12 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+                    <ShieldAlert className="w-6 h-6 text-destructive" />
+                </div>
+                <p className="text-foreground font-medium">{error}</p>
+                <Button variant="outline" onClick={() => navigate('/')}>Voltar para minhas viagens</Button>
+            </div>
+        );
+    }
+
     const handleDeleteExpense = async () => {
         if (!expenseToDelete) return;
         try {
             await deleteExpense(expenseToDelete.id);
             setExpenseToDelete(null);
-        } catch (error) { console.error("Erro ao excluir despesa:", error); }
+        } catch (err) {
+            console.error("Erro ao excluir despesa:", err);
+            showError("Não foi possível excluir a despesa. Tente novamente.");
+        }
     };
 
     const handleDeleteTrip = async () => {
@@ -147,7 +169,10 @@ export default function TripDetails() {
         try {
             await deleteTripCascade(tripId);
             navigate('/');
-        } catch (error) { console.error("Erro ao excluir viagem:", error); }
+        } catch (err) {
+            console.error("Erro ao excluir viagem:", err);
+            showError("Não foi possível excluir a viagem. Tente novamente.");
+        }
     };
 
     const resetFilters = () => {
@@ -176,28 +201,40 @@ export default function TripDetails() {
         if (!tripId) return;
         try {
             await changeMemberRole(tripId, uid, newRole);
-        } catch (error) { console.error("Erro ao trocar papel do membro:", error); }
+        } catch (err) {
+            console.error("Erro ao trocar papel do membro:", err);
+            showError("Não foi possível trocar o papel do membro.");
+        }
     };
 
     const handleRemoveMember = async (uid: string) => {
         if (!tripId) return;
         try {
             await removeMember(tripId, uid);
-        } catch (error) { console.error("Erro ao remover membro:", error); }
+        } catch (err) {
+            console.error("Erro ao remover membro:", err);
+            showError("Não foi possível remover o membro.");
+        }
     };
 
     const handleAddGhost = async (name: string) => {
         if (!tripId) return;
         try {
             await addGhostMember(tripId, name);
-        } catch (error) { console.error("Erro ao adicionar convidado:", error); }
+        } catch (err) {
+            console.error("Erro ao adicionar convidado:", err);
+            showError("Não foi possível adicionar o convidado.");
+        }
     };
 
     const handleRenameGhost = async (ghostUid: string, name: string) => {
         if (!tripId) return;
         try {
             await renameGhostMember(tripId, ghostUid, name);
-        } catch (error) { console.error("Erro ao renomear convidado:", error); }
+        } catch (err) {
+            console.error("Erro ao renomear convidado:", err);
+            showError("Não foi possível renomear o convidado.");
+        }
     };
 
     const handleLinkGhost = async (ghostUid: string, realUid: string) => {
@@ -205,20 +242,29 @@ export default function TripDetails() {
         try {
             await linkGhostToUser(tripId, ghostUid, realUid);
             setGhostToLink(null);
-        } catch (error) { console.error("Erro ao vincular convidado:", error); }
+        } catch (err) {
+            console.error("Erro ao vincular convidado:", err);
+            showError("Não foi possível vincular o convidado.");
+        }
     };
 
     const handleSettle = async (from: string, to: string, amount: number) => {
         if (!tripId) return;
         try {
             await createSettlement(tripId, from, to, amount);
-        } catch (error) { console.error("Erro ao registrar pagamento:", error); }
+        } catch (err) {
+            console.error("Erro ao registrar pagamento:", err);
+            showError("Não foi possível registrar o pagamento.");
+        }
     };
 
     const handleDeleteSettlement = async (settlementId: string) => {
         try {
             await deleteSettlement(settlementId);
-        } catch (error) { console.error("Erro ao excluir acerto:", error); }
+        } catch (err) {
+            console.error("Erro ao excluir acerto:", err);
+            showError("Não foi possível excluir o acerto.");
+        }
     };
 
     return (
@@ -233,7 +279,7 @@ export default function TripDetails() {
                 {canEdit && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors outline-none">
+                            <button aria-label="Gerenciar viagem" className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors outline-none">
                                 <MoreHorizontal className="w-5 h-5" />
                             </button>
                         </DropdownMenuTrigger>
@@ -287,6 +333,7 @@ export default function TripDetails() {
             {trip && (
                 <TripMembers
                     trip={trip}
+                    profiles={profiles}
                     canEdit={canEdit}
                     onChangeRole={handleChangeRole}
                     onRemoveMember={handleRemoveMember}
@@ -324,6 +371,7 @@ export default function TripDetails() {
             {trip && (
                 <BalancesSummary
                     trip={trip}
+                    profiles={profiles}
                     balances={balances}
                     currentUserUid={user?.uid || ''}
                     canViewAll={canEdit}
@@ -345,6 +393,7 @@ export default function TripDetails() {
             {trip && (
                 <ExpenseTable
                     trip={trip}
+                    profiles={profiles}
                     expenses={paginatedExpenses}
                     totalCount={sortedExpenses.length}
                     canEdit={canEdit}
@@ -366,6 +415,7 @@ export default function TripDetails() {
                     open={!!expenseToView}
                     onOpenChange={() => setExpenseToView(null)}
                     trip={trip}
+                    profiles={profiles}
                     expense={expenseToView}
                 />
             )}
@@ -375,6 +425,8 @@ export default function TripDetails() {
                     open={isAddExpenseOpen}
                     onOpenChange={setIsAddExpenseOpen}
                     trip={trip}
+                    profiles={profiles}
+                    rates={currentRates}
                     expenseToEdit={expenseToEdit}
                 />
             )}
@@ -392,6 +444,7 @@ export default function TripDetails() {
                     open={!!ghostToLink}
                     onOpenChange={() => setGhostToLink(null)}
                     trip={trip}
+                    profiles={profiles}
                     ghostUid={ghostToLink}
                     onConfirm={handleLinkGhost}
                 />
@@ -402,6 +455,7 @@ export default function TripDetails() {
                     open={!!memberToInspect}
                     onOpenChange={() => setMemberToInspect(null)}
                     trip={trip}
+                    profiles={profiles}
                     memberUid={memberToInspect}
                     expenses={expenses}
                     settlements={settlements}

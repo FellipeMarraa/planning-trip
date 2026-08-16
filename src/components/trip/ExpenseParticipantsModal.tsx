@@ -1,24 +1,22 @@
 // src/components/trip/ExpenseParticipantsModal.tsx
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
-import { getMemberName, isGhostUid } from "@/lib/members";
+import { getMemberName } from "@/lib/members";
 import { Users } from "lucide-react";
-import type { Expense, Trip } from '@/types';
+import type { Expense, Trip, UserProfile } from '@/types';
 
 interface ExpenseParticipantsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     trip: Trip;
+    profiles: Record<string, UserProfile>;
     expense: Expense | null;
 }
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseParticipantsModal({ open, onOpenChange, trip, expense }: ExpenseParticipantsModalProps) {
-    const profiles = useUserProfiles((trip.participants || []).filter((uid) => !isGhostUid(uid)));
-
+export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, expense }: ExpenseParticipantsModalProps) {
     if (!expense) return null;
 
     const participants = expense.participants || [];

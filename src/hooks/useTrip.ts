@@ -1,7 +1,7 @@
 // src/hooks/useTrip.ts
 import { useEffect, useState } from 'react';
 import { db } from '../config/firebase';
-import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, limit } from 'firebase/firestore';
 import type { Trip, Expense } from '@/types';
 
 export const useTrip = (tripId: string) => {
@@ -33,8 +33,8 @@ export const useTrip = (tripId: string) => {
             }
         );
 
-        // Listener de Gastos
-        const q = query(collection(db, 'expenses'), where('tripId', '==', tripId));
+        // Listener de Gastos (teto de segurança contra crescimento sem limite)
+        const q = query(collection(db, 'expenses'), where('tripId', '==', tripId), limit(1000));
         const unsubExpenses = onSnapshot(
             q,
             (snapshot) => {

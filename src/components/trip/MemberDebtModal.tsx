@@ -2,16 +2,16 @@
 import { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
-import { getMemberName, isGhostUid } from "@/lib/members";
+import { getMemberName } from "@/lib/members";
 import { useAuth } from "@/context/AuthContext";
 import { Scale, Trash2 } from "lucide-react";
-import type { Expense, Settlement, Trip } from '@/types';
+import type { Expense, Settlement, Trip, UserProfile } from '@/types';
 
 interface MemberDebtModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     trip: Trip;
+    profiles: Record<string, UserProfile>;
     memberUid: string | null;
     expenses: Expense[];
     settlements: Settlement[];
@@ -35,9 +35,8 @@ interface DebtGroup {
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses, settlements, onSettle, onDeleteSettlement, canEdit }: MemberDebtModalProps) {
+export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid, expenses, settlements, onSettle, onDeleteSettlement, canEdit }: MemberDebtModalProps) {
     const { user } = useAuth();
-    const profiles = useUserProfiles((trip.participants || []).filter((uid) => !isGhostUid(uid)));
 
     const relatedSettlements = useMemo(
         () => settlements.filter((s) => s.from === memberUid || s.to === memberUid),

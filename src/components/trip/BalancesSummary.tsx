@@ -2,14 +2,14 @@
 import { useState } from 'react';
 import { SectionHeader } from "@/components/common/section-header";
 import { Button } from "@/components/ui/button";
-import { useUserProfiles } from "@/hooks/useUserProfiles";
-import { getMemberName, isGhostUid } from "@/lib/members";
+import { getMemberName } from "@/lib/members";
 import { ChevronLeft, ChevronRight, Lock, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Trip } from '@/types';
+import type { Trip, UserProfile } from '@/types';
 
 interface BalancesSummaryProps {
     trip: Trip;
+    profiles: Record<string, UserProfile>;
     balances: Record<string, number>;
     currentUserUid: string;
     canViewAll: boolean;
@@ -21,9 +21,8 @@ const formatBRL = (value: number) =>
 
 const MEMBERS_PER_PAGE = 4;
 
-export function BalancesSummary({ trip, balances, currentUserUid, canViewAll, onSelectMember }: BalancesSummaryProps) {
+export function BalancesSummary({ trip, profiles, balances, currentUserUid, canViewAll, onSelectMember }: BalancesSummaryProps) {
     const participants = trip.participants || [];
-    const profiles = useUserProfiles(participants.filter((uid) => !isGhostUid(uid)));
     const [currentPage, setCurrentPage] = useState(1);
 
     const totalPages = Math.max(1, Math.ceil(participants.length / MEMBERS_PER_PAGE));
