@@ -4,12 +4,15 @@ import { SectionHeader } from "@/components/common/section-header";
 import { Button } from "@/components/ui/button";
 import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { getMemberName, isGhostUid } from "@/lib/members";
-import { ChevronLeft, ChevronRight, Scale } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, Scale } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Trip } from '@/types';
 
 interface BalancesSummaryProps {
     trip: Trip;
     balances: Record<string, number>;
+    currentUserUid: string;
+    canViewAll: boolean;
     onSelectMember: (uid: string) => void;
 }
 
@@ -18,7 +21,7 @@ const formatBRL = (value: number) =>
 
 const MEMBERS_PER_PAGE = 4;
 
-export function BalancesSummary({ trip, balances, onSelectMember }: BalancesSummaryProps) {
+export function BalancesSummary({ trip, balances, currentUserUid, canViewAll, onSelectMember }: BalancesSummaryProps) {
     const participants = trip.participants || [];
     const profiles = useUserProfiles(participants.filter((uid) => !isGhostUid(uid)));
     const [currentPage, setCurrentPage] = useState(1);
@@ -35,20 +38,50 @@ export function BalancesSummary({ trip, balances, onSelectMember }: BalancesSumm
                     const balance = balances[uid] || 0;
                     const isCredit = balance > 0.01;
                     const isDebt = balance < -0.01;
+                    const isOwnCard = uid === currentUserUid;
+                    const isLocked = !canViewAll && !isOwnCard;
+
+                    const cardContent = (
+                        <>
+                            <p className="text-sm text-foreground truncate mb-1">{getMemberName(uid, trip, profiles)}</p>
+                            {isLocked ? (
+                                <>
+                                    <p className="text-lg font-semibold text-muted-foreground/30 tracking-widest">••••••</p>
+                                    <p className="text-xs text-muted-foreground/60 mt-0.5 flex items-center gap-1">
+                                        <Lock className="w-3 h-3" /> privado
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className={`text-lg font-semibold tabular-nums truncate ${isCredit ? 'text-chart-2' : isDebt ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                        {isDebt ? '-' : isCredit ? '+' : ''}{formatBRL(balance)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        {isCredit ? 'a receber' : isDebt ? 'a pagar' : 'quite'}
+                                    </p>
+                                </>
+                            )}
+                        </>
+                    );
+
+                    if (isLocked) {
+                        return (
+                            <div key={uid} className="min-w-0 text-left p-4 rounded-2xl bg-muted/20 border border-border cursor-not-allowed">
+                                {cardContent}
+                            </div>
+                        );
+                    }
 
                     return (
                         <button
                             key={uid}
                             onClick={() => onSelectMember(uid)}
-                            className="min-w-0 text-left p-4 rounded-2xl bg-muted/40 border border-border hover:border-primary/30 transition-colors"
+                            className={cn(
+                                "min-w-0 text-left p-4 rounded-2xl bg-muted/40 border border-border hover:border-primary/30 transition-colors",
+                                isOwnCard && !canViewAll && "border-primary/30"
+                            )}
                         >
-                            <p className="text-sm text-foreground truncate mb-1">{getMemberName(uid, trip, profiles)}</p>
-                            <p className={`text-lg font-semibold tabular-nums truncate ${isCredit ? 'text-chart-2' : isDebt ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                {isDebt ? '-' : isCredit ? '+' : ''}{formatBRL(balance)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                {isCredit ? 'a receber' : isDebt ? 'a pagar' : 'quite'}
-                            </p>
+                            {cardContent}
                         </button>
                     );
                 })}

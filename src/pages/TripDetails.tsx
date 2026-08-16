@@ -1,6 +1,7 @@
 // src/pages/TripDetails.tsx
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { useTrip } from '@/hooks/useTrip';
 import { useExchange } from '@/hooks/useExchange';
 import { useTripRole } from '@/hooks/useTripRole';
@@ -76,21 +77,28 @@ export default function TripDetails() {
     const [ghostToLink, setGhostToLink] = useState<string | null>(null);
     const [memberToInspect, setMemberToInspect] = useState<string | null>(null);
 
+    const { user } = useAuth();
     const { trip, expenses, loading } = useTrip(tripId || '');
     const { rates: currentRates } = useExchange();
     const { canEdit } = useTripRole(trip);
     const { settlements } = useSettlements(tripId || '');
     const balances = useTripBalances(trip?.participants || [], expenses, settlements);
 
+    // Visualizador só vê despesas em que participou; owner/editor vê tudo.
+    const visibleExpenses = useMemo(() => {
+        if (canEdit) return expenses;
+        return expenses.filter(expense => (expense.participants || []).includes(user?.uid || ''));
+    }, [expenses, canEdit, user?.uid]);
+
     const filteredExpenses = useMemo(() => {
         const query = searchQuery.trim().toLowerCase();
-        return expenses.filter(expense => {
+        return visibleExpenses.filter(expense => {
             const matchCategory = filterCategory === 'all' || expense.category === filterCategory;
             const matchCurrency = filterCurrency === 'all' || expense.currency === filterCurrency;
             const matchSearch = query === '' || expense.description.toLowerCase().includes(query);
             return matchCategory && matchCurrency && matchSearch;
         });
-    }, [expenses, filterCategory, filterCurrency, searchQuery]);
+    }, [visibleExpenses, filterCategory, filterCurrency, searchQuery]);
 
     const sortedExpenses = useMemo(() => {
         if (!sortKey) return filteredExpenses;
@@ -317,6 +325,8 @@ export default function TripDetails() {
                 <BalancesSummary
                     trip={trip}
                     balances={balances}
+                    currentUserUid={user?.uid || ''}
+                    canViewAll={canEdit}
                     onSelectMember={setMemberToInspect}
                 />
             )}

@@ -67,13 +67,13 @@ export function ExpenseTable({ trip, expenses, totalCount, canEdit, currentPage,
                         <th className="px-6 py-3 font-medium">Pago por</th>
                         <SortableHeader column="amountOriginal" label="Origem" align="right" />
                         <SortableHeader column="amountBRL" label="Total (BRL)" align="right" />
-                        <th className="px-6 py-3 text-right font-medium">Ações</th>
+                        {canEdit && <th className="px-6 py-3 text-right font-medium">Ações</th>}
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                     {expenses.length === 0 ? (
                         <tr>
-                            <td colSpan={6} className="p-0">
+                            <td colSpan={canEdit ? 6 : 5} className="p-0">
                                 <EmptyState icon={Wallet} message="Nenhuma despesa registrada" dashed={false} />
                             </td>
                         </tr>
@@ -109,38 +109,36 @@ export function ExpenseTable({ trip, expenses, totalCount, canEdit, currentPage,
                                         Hoje: {formatBRL(expense.amountOriginal * (currentRates[expense.currency] || 0))}
                                     </p>
                                 </td>
-                                <td className="px-6 py-4 text-right whitespace-nowrap">
-                                    <div className="flex items-center justify-end gap-1">
-                                        <button
-                                            type="button"
-                                            onClick={() => onViewParticipants(expense)}
-                                            className="h-9 w-9 flex items-center justify-center text-muted-foreground active:text-primary active:bg-primary/10 rounded-lg transition-colors"
-                                            aria-label="Ver participantes"
-                                        >
-                                            <Users className="h-4 w-4" />
-                                        </button>
-                                        {canEdit && (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onEdit(expense)}
-                                                    className="h-9 w-9 flex items-center justify-center text-muted-foreground active:text-primary active:bg-primary/10 rounded-lg transition-colors"
-                                                    aria-label="Editar despesa"
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => onDelete(expense)}
-                                                    className="h-9 w-9 flex items-center justify-center text-muted-foreground active:text-destructive active:bg-destructive/10 rounded-lg transition-colors"
-                                                    aria-label="Excluir despesa"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </td>
+                                {canEdit && (
+                                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => onViewParticipants(expense)}
+                                                className="h-9 w-9 flex items-center justify-center text-muted-foreground active:text-primary active:bg-primary/10 rounded-lg transition-colors"
+                                                aria-label="Ver participantes"
+                                            >
+                                                <Users className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => onEdit(expense)}
+                                                className="h-9 w-9 flex items-center justify-center text-muted-foreground active:text-primary active:bg-primary/10 rounded-lg transition-colors"
+                                                aria-label="Editar despesa"
+                                            >
+                                                <Pencil className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => onDelete(expense)}
+                                                className="h-9 w-9 flex items-center justify-center text-muted-foreground active:text-destructive active:bg-destructive/10 rounded-lg transition-colors"
+                                                aria-label="Excluir despesa"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         ))
                     )}

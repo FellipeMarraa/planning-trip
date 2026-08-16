@@ -10,11 +10,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
-import { LogIn, Plane, ScrollText, ShieldCheck, X } from "lucide-react";
+import { LogIn, Plane, ScrollText, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { isInAppBrowser } from "@/lib/inAppBrowser";
 
 export default function Login() {
     const { loginWithGoogle } = useAuth();
     const [isTermsOpen, setIsTermsOpen] = useState(false);
+    const [inAppBrowser] = useState(isInAppBrowser);
 
     return (
         <div className="h-screen w-full bg-background flex items-center justify-center p-6 relative overflow-hidden text-foreground font-sans">
@@ -42,14 +44,24 @@ export default function Login() {
                         <p className="text-muted-foreground text-sm">Entre para acessar suas viagens</p>
                     </div>
 
-                    <Button
-                        variant="default"
-                        className="w-full h-12 font-medium gap-3 rounded-xl shadow-sm"
-                        onClick={loginWithGoogle}
-                    >
-                        <LogIn className="w-4 h-4" />
-                        Continuar com Google
-                    </Button>
+                    {inAppBrowser ? (
+                        <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+                            <TriangleAlert className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-destructive leading-relaxed">
+                                O login do Google não funciona dentro do navegador do WhatsApp/Instagram.
+                                Toque no menu (⋮ ou ···) e escolha <strong>"Abrir no navegador"</strong> para continuar.
+                            </p>
+                        </div>
+                    ) : (
+                        <Button
+                            variant="default"
+                            className="w-full h-12 font-medium gap-3 rounded-xl shadow-sm"
+                            onClick={loginWithGoogle}
+                        >
+                            <LogIn className="w-4 h-4" />
+                            Continuar com Google
+                        </Button>
+                    )}
 
                     <p className="text-xs text-muted-foreground text-center leading-relaxed">
                         Ao entrar, você concorda com nossos{' '}

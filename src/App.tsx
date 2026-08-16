@@ -3,6 +3,7 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/layout/Layout';
+import { consumePostLoginRedirect, savePostLoginRedirect } from './lib/postLoginRedirect';
 
 // Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
@@ -31,7 +32,10 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
 
     if (loading) return <PageLoader />;
 
-    if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+    if (!user) {
+        savePostLoginRedirect(location.pathname + location.search);
+        return <Navigate to="/login" replace />;
+    }
 
     if (roleRequired === 'GLOBAL' && !isGlobalAdmin) {
         return <Navigate to="/" replace />;
@@ -46,12 +50,10 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
-    const location = useLocation();
 
     if (loading) return null;
     if (user) {
-        const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
-        return <Navigate to={from ? `${from.pathname}${from.search || ''}` : '/'} replace />;
+        return <Navigate to={consumePostLoginRedirect() || '/'} replace />;
     }
 
     return <>{children}</>;

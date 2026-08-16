@@ -1,6 +1,6 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import {auth} from '../config/firebase';
-import {GoogleAuthProvider, signInWithPopup, signOut, type User} from 'firebase/auth';
+import {GoogleAuthProvider, getRedirectResult, signInWithRedirect, signOut, type User} from 'firebase/auth';
 import {upsertUserProfile} from '../services/users';
 
 interface AuthContextType {
@@ -23,9 +23,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const isGlobalAdmin = user ? GLOBAL_ADMIN_EMAILS.includes(user.email || '') : false;
 
     const loginWithGoogle = async () => {
+        // Redirect em vez de popup: popups são bloqueados/pouco confiáveis em
+        // navegadores mobile e dentro de webviews de apps (WhatsApp, Instagram).
         const provider = new GoogleAuthProvider();
         try {
-            await signInWithPopup(auth, provider);
+            await signInWithRedirect(auth, provider);
         } catch (error) {
             console.error("Erro ao fazer login:", error);
         }
@@ -34,6 +36,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = () => signOut(auth);
 
     useEffect(() => {
+        // Processa o retorno do signInWithRedirect (a página recarrega ao voltar do Google).
+        getRedirectResult(auth).catch((error) => console.error("Erro ao concluir login:", error));
+
         const unsubscribe = auth.onAuthStateChanged((user) => {
             setUser(user);
             setLoading(false);
