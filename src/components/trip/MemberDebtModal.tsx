@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { getMemberName, isGhostUid } from "@/lib/members";
 import { useAuth } from "@/context/AuthContext";
-import { Scale } from "lucide-react";
+import { Scale, Trash2 } from "lucide-react";
 import type { Expense, Settlement, Trip } from '@/types';
 
 interface MemberDebtModalProps {
@@ -16,14 +16,21 @@ interface MemberDebtModalProps {
     expenses: Expense[];
     settlements: Settlement[];
     onSettle: (from: string, to: string, amount: number) => void;
+    onDeleteSettlement: (settlementId: string) => void;
+    canEdit: boolean;
 }
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses, settlements, onSettle }: MemberDebtModalProps) {
+export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses, settlements, onSettle, onDeleteSettlement, canEdit }: MemberDebtModalProps) {
     const { user } = useAuth();
     const profiles = useUserProfiles((trip.participants || []).filter((uid) => !isGhostUid(uid)));
+
+    const relatedSettlements = useMemo(
+        () => settlements.filter((s) => s.from === memberUid || s.to === memberUid),
+        [settlements, memberUid]
+    );
 
     const { debts, credits } = useMemo(() => {
         if (!memberUid) return { debts: [] as [string, number][], credits: [] as [string, number][] };
@@ -108,6 +115,33 @@ export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses,
                                         <Button size="sm" variant="outline" onClick={() => onSettle(debtorUid, memberUid, amount)}>
                                             Marquei como recebido
                                         </Button>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Acertos registrados</p>
+                        {relatedSettlements.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhum pagamento registrado ainda.</p>
+                        ) : (
+                            relatedSettlements.map((s) => (
+                                <div key={s.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40">
+                                    <p className="text-sm text-muted-foreground">
+                                        <span className="text-foreground">{getMemberName(s.from, trip, profiles)}</span> pagou{' '}
+                                        <span className="text-foreground">{getMemberName(s.to, trip, profiles)}</span>
+                                        <span className="tabular-nums"> · {formatBRL(s.amount)}</span>
+                                    </p>
+                                    {(canEdit || user?.uid === s.to) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onDeleteSettlement(s.id)}
+                                            className="h-8 w-8 flex items-center justify-center text-muted-foreground active:text-destructive active:bg-destructive/10 rounded-lg transition-colors flex-shrink-0"
+                                            aria-label="Excluir acerto"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
                                     )}
                                 </div>
                             ))

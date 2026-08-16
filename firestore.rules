@@ -68,7 +68,7 @@ service cloud.firestore {
     match /settlements/{settlementId} {
       allow read: if isParticipant(resource.data.tripId);
       allow create: if isParticipant(request.resource.data.tripId) && request.resource.data.to == request.auth.uid;
-      allow delete: if canEdit(resource.data.tripId);
+      allow delete: if canEdit(resource.data.tripId) || resource.data.to == request.auth.uid;
     }
 
     match /{document=**} {

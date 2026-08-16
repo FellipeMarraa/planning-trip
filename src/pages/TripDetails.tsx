@@ -8,7 +8,7 @@ import { useSettlements } from '@/hooks/useSettlements';
 import { useTripBalances } from '@/hooks/useTripBalances';
 import { addGhostMember, changeMemberRole, deleteTripCascade, linkGhostToUser, removeMember } from '@/services/trips';
 import { deleteExpense } from '@/services/expenses';
-import { createSettlement } from '@/services/settlements';
+import { createSettlement, deleteSettlement } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/common/stat-card";
 import { TripMembers } from "@/components/trip/TripMembers";
@@ -168,6 +168,12 @@ export default function TripDetails() {
         try {
             await createSettlement(tripId, from, to, amount);
         } catch (error) { console.error("Erro ao registrar pagamento:", error); }
+    };
+
+    const handleDeleteSettlement = async (settlementId: string) => {
+        try {
+            await deleteSettlement(settlementId);
+        } catch (error) { console.error("Erro ao excluir acerto:", error); }
     };
 
     const formatDate = (dateStr: string | undefined) => {
@@ -342,6 +348,8 @@ export default function TripDetails() {
                     expenses={expenses}
                     settlements={settlements}
                     onSettle={handleSettle}
+                    onDeleteSettlement={handleDeleteSettlement}
+                    canEdit={canEdit}
                 />
             )}
 
