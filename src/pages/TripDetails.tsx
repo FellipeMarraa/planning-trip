@@ -17,6 +17,7 @@ import { BalancesSummary } from "@/components/trip/BalancesSummary";
 import { MemberDebtModal } from "@/components/trip/MemberDebtModal";
 import { ExpenseFilters } from "@/components/trip/ExpenseFilters";
 import { ExpenseTable } from "@/components/trip/ExpenseTable";
+import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsModal";
 import {
     Calendar,
     Map,
@@ -57,6 +58,7 @@ export default function TripDetails() {
     const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
     const [expenseToEdit, setExpenseToEdit] = useState<Expense | undefined>(undefined);
     const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+    const [expenseToView, setExpenseToView] = useState<Expense | null>(null);
     const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
 
     const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -299,6 +301,16 @@ export default function TripDetails() {
                     onPageChange={setCurrentPage}
                     onEdit={(expense) => { setExpenseToEdit(expense); setIsAddExpenseOpen(true); }}
                     onDelete={setExpenseToDelete}
+                    onViewParticipants={setExpenseToView}
+                />
+            )}
+
+            {trip && (
+                <ExpenseParticipantsModal
+                    open={!!expenseToView}
+                    onOpenChange={() => setExpenseToView(null)}
+                    trip={trip}
+                    expense={expenseToView}
                 />
             )}
 
