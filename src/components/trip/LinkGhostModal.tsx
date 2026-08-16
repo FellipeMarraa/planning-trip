@@ -31,8 +31,8 @@ export function LinkGhostModal({ open, onOpenChange, trip, ghostUid, onConfirm }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[400px] rounded-3xl p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b border-border bg-muted/40">
+            <DialogContent className="max-w-[400px] max-h-[85vh] rounded-3xl p-0 overflow-hidden flex flex-col">
+                <DialogHeader className="p-6 border-b border-border bg-muted/40 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-lg">
                             <Link2 className="w-4 h-4 text-primary" />
@@ -44,7 +44,7 @@ export function LinkGhostModal({ open, onOpenChange, trip, ghostUid, onConfirm }
                     </div>
                 </DialogHeader>
 
-                <div className="p-6 space-y-2 max-h-[280px] overflow-y-auto scrollbar-none">
+                <div className="p-6 space-y-2 overflow-y-auto scrollbar-none flex-1 min-h-0">
                     {realParticipants.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-6">
                             Nenhum outro membro com login nesta viagem ainda.
@@ -66,7 +66,7 @@ export function LinkGhostModal({ open, onOpenChange, trip, ghostUid, onConfirm }
                     )}
                 </div>
 
-                <div className="p-4 bg-muted/40 border-t border-border flex gap-3">
+                <div className="p-4 bg-muted/40 border-t border-border flex gap-3 flex-shrink-0">
                     <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="flex-1">Cancelar</Button>
                     <Button
                         type="button"
