@@ -15,47 +15,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <div className="min-h-screen pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">            {/* Nav com Glassmorphism Dark */}
-            <nav className="sticky top-0 z-50 w-full border-b border-white/[0.04] bg-[#0b1222]/80 backdrop-blur-xl">
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="min-h-screen bg-background text-foreground pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+            <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/85 backdrop-blur-xl">
+                <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
 
-                    {/* Logo Refinada */}
-                    <Link to="/" className="flex items-center gap-3 group">
-                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20 transition-transform active:scale-95">
-                            <Plane className="w-4 h-4 text-white -rotate-45" />
+                    <Link to="/" className="flex items-center gap-2.5 group">
+                        <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm transition-transform group-active:scale-95">
+                            <Plane className="w-4 h-4 text-primary-foreground -rotate-45" />
                         </div>
-                        <div className="flex flex-col leading-none">
-                            <span className="font-medium text-[15px] tracking-tight text-white">
-                                TripVision <span className="text-blue-500 font-light uppercase text-[10px] ml-1 tracking-[0.2em]">Pro</span>
-                            </span>
-                        </div>
+                        <span className="font-semibold text-base tracking-tight text-foreground">
+                            Trip<span className="text-primary">Planner</span>
+                        </span>
                     </Link>
 
-                    <div className="flex items-center gap-3 md:gap-6">
+                    <div className="flex items-center gap-3 md:gap-5">
                         {isGlobalAdmin && (
                             <Link to="/admin">
-                                <Button variant="ghost" size="icon" className="text-slate-500 hover:text-white hover:bg-white/[0.05] rounded-xl transition-all">
+                                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground rounded-xl">
                                     <Settings className="w-4 h-4" />
                                 </Button>
                             </Link>
                         )}
 
-                        <div className="h-4 w-[1px] bg-white/[0.08] mx-1 hidden sm:block" />
+                        <div className="h-5 w-px bg-border hidden sm:block" />
 
-                        <div className="flex items-center gap-4">
-                            {/* User Info com tipografia sutil */}
-                            <div className="text-right hidden md:block">
-                                <p className="text-[11px] font-medium text-slate-200 leading-none">{user?.displayName}</p>
-                                <p className="text-[9px] text-slate-500 font-medium mt-1 uppercase tracking-wider">{user?.email?.split('@')[0]}</p>
+                        <div className="flex items-center gap-3">
+                            <div className="text-right hidden md:block leading-tight">
+                                <p className="text-sm font-medium text-foreground">{user?.displayName}</p>
+                                <p className="text-xs text-muted-foreground">{user?.email}</p>
                             </div>
 
-                            {/* Avatar com borda fina */}
-                            <div className="w-8 h-8 rounded-full border border-white/[0.08] bg-white/[0.03] overflow-hidden shadow-inner">
+                            <div className="w-9 h-9 rounded-full border border-border bg-muted overflow-hidden">
                                 {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="" className="w-full h-full object-cover opacity-90" referrerPolicy="no-referrer" />
+                                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                        <UserIcon className="w-3.5 h-3.5 text-slate-600" />
+                                        <UserIcon className="w-4 h-4 text-muted-foreground" />
                                     </div>
                                 )}
                             </div>
@@ -64,7 +59,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={handleLogout}
-                                className="text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                                className="text-muted-foreground hover:text-destructive rounded-xl"
                             >
                                 <LogOut className="w-4 h-4" />
                             </Button>
@@ -73,8 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
             </nav>
 
-            {/* Main Content Area */}
-            <main className="max-w-7xl mx-auto px-6 py-10">
+            <main className="max-w-6xl mx-auto px-6 py-10">
                 {children}
             </main>
         </div>

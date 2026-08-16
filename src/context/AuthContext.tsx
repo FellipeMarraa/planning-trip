@@ -1,6 +1,7 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import {auth} from '../config/firebase';
 import {GoogleAuthProvider, signInWithPopup, signOut, type User} from 'firebase/auth';
+import {upsertUserProfile} from '../services/users';
 
 interface AuthContextType {
     user: User | null;
@@ -36,6 +37,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = auth.onAuthStateChanged((user) => {
             setUser(user);
             setLoading(false);
+            if (user) {
+                upsertUserProfile(user).catch((error) => console.error("Erro ao salvar perfil:", error));
+            }
         });
         return unsubscribe;
     }, []);

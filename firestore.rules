@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function tripData(tripId) {
+      return get(/databases/$(database)/documents/trips/$(tripId)).data;
+    }
+
+    function role(tripId) {
+      return tripData(tripId).roles[request.auth.uid];
+    }
+
+    function isParticipant(tripId) {
+      return isSignedIn() && request.auth.uid in tripData(tripId).participants;
+    }
+
+    function canEdit(tripId) {
+      return isSignedIn() && role(tripId) in ['OWNER', 'EDITOR'];
+    }
+
+    match /trips/{tripId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.participants == [request.auth.uid]
+        && request.resource.data.roles[request.auth.uid] == 'OWNER';
+
+      allow update: if isSignedIn() && (
+        (
+          canEdit(tripId) &&
+          request.resource.data.roles[resource.data.ownerId] == 'OWNER' &&
+          resource.data.ownerId in request.resource.data.participants
+        ) || (
+          // Auto-join via link de convite: usuário novo só pode adicionar a si mesmo
+          !(request.auth.uid in resource.data.participants) &&
+          request.resource.data.participants == resource.data.participants.concat([request.auth.uid]) &&
+          request.resource.data.roles[request.auth.uid] in ['EDITOR', 'VIEWER'] &&
+          request.resource.data.roles.diff(resource.data.roles).affectedKeys().hasOnly([request.auth.uid]) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'roles'])
+        )
+      );
+
+      allow delete: if canEdit(tripId);
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isParticipant(resource.data.tripId);
+      allow create: if canEdit(request.resource.data.tripId);
+      allow update, delete: if canEdit(resource.data.tripId);
+    }
+
+    match /activities/{activityId} {
+      allow read: if isParticipant(resource.data.tripId);
+      allow create: if canEdit(request.resource.data.tripId);
+      allow update, delete: if canEdit(resource.data.tripId);
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /settlements/{settlementId} {
+      allow read: if isParticipant(resource.data.tripId);
+      allow create: if isParticipant(request.resource.data.tripId) && request.resource.data.to == request.auth.uid;
+      allow delete: if canEdit(resource.data.tripId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,124 @@
+// src/components/trip/MemberDebtModal.tsx
+import { useMemo } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useUserProfiles } from "@/hooks/useUserProfiles";
+import { getMemberName, isGhostUid } from "@/lib/members";
+import { useAuth } from "@/context/AuthContext";
+import { Scale } from "lucide-react";
+import type { Expense, Settlement, Trip } from '@/types';
+
+interface MemberDebtModalProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    trip: Trip;
+    memberUid: string | null;
+    expenses: Expense[];
+    settlements: Settlement[];
+    onSettle: (from: string, to: string, amount: number) => void;
+}
+
+const formatBRL = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+export function MemberDebtModal({ open, onOpenChange, trip, memberUid, expenses, settlements, onSettle }: MemberDebtModalProps) {
+    const { user } = useAuth();
+    const profiles = useUserProfiles((trip.participants || []).filter((uid) => !isGhostUid(uid)));
+
+    const { debts, credits } = useMemo(() => {
+        if (!memberUid) return { debts: [] as [string, number][], credits: [] as [string, number][] };
+
+        const owed: Record<string, number> = {};
+        const owedToMe: Record<string, number> = {};
+
+        expenses.forEach((exp) => {
+            const participants = exp.participants || [];
+            const share = (Number(exp.amountBRL) || 0) / (participants.length || 1);
+            if (!participants.includes(memberUid)) return;
+
+            if (exp.paidBy === memberUid) {
+                participants.forEach((uid) => {
+                    if (uid !== memberUid) owedToMe[uid] = (owedToMe[uid] || 0) + share;
+                });
+            } else {
+                owed[exp.paidBy] = (owed[exp.paidBy] || 0) + share;
+            }
+        });
+
+        settlements.forEach((s) => {
+            if (s.from === memberUid && owed[s.to] !== undefined) owed[s.to] -= s.amount;
+            if (s.to === memberUid && owedToMe[s.from] !== undefined) owedToMe[s.from] -= s.amount;
+        });
+
+        return {
+            debts: Object.entries(owed).filter(([, amount]) => amount > 0.01),
+            credits: Object.entries(owedToMe).filter(([, amount]) => amount > 0.01),
+        };
+    }, [memberUid, expenses, settlements]);
+
+    if (!memberUid) return null;
+    const memberName = getMemberName(memberUid, trip, profiles);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-[420px] rounded-3xl p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b border-border bg-muted/40">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                            <Scale className="w-4 h-4 text-primary" />
+                        </div>
+                        <DialogTitle className="text-base font-semibold text-foreground">{memberName}</DialogTitle>
+                    </div>
+                </DialogHeader>
+
+                <div className="p-6 space-y-6 max-h-[420px] overflow-y-auto scrollbar-none">
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Deve para</p>
+                        {debts.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Nenhuma dívida pendente.</p>
+                        ) : (
+                            debts.map(([creditorUid, amount]) => (
+                                <div key={creditorUid} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40">
+                                    <div>
+                                        <p className="text-sm text-foreground">{getMemberName(creditorUid, trip, profiles)}</p>
+                                        <p className="text-sm font-semibold text-destructive tabular-nums">{formatBRL(amount)}</p>
+                                    </div>
+                                    {user?.uid === creditorUid && (
+                                        <Button size="sm" variant="outline" onClick={() => onSettle(memberUid, creditorUid, amount)}>
+                                            Marquei como recebido
+                                        </Button>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Recebe de</p>
+                        {credits.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">Ninguém deve para este membro.</p>
+                        ) : (
+                            credits.map(([debtorUid, amount]) => (
+                                <div key={debtorUid} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-muted/40">
+                                    <div>
+                                        <p className="text-sm text-foreground">{getMemberName(debtorUid, trip, profiles)}</p>
+                                        <p className="text-sm font-semibold text-chart-2 tabular-nums">{formatBRL(amount)}</p>
+                                    </div>
+                                    {user?.uid === memberUid && (
+                                        <Button size="sm" variant="outline" onClick={() => onSettle(debtorUid, memberUid, amount)}>
+                                            Marquei como recebido
+                                        </Button>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                <div className="p-4 bg-muted/40 border-t border-border">
+                    <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="w-full">Fechar</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}

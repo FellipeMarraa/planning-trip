@@ -11,8 +11,8 @@ import TripItineraryPage from "@/pages/TripItineraryPage.tsx"; // Nova importaç
 
 const GlobalAdminPlaceholder = () => (
     <div className="space-y-2">
-        <h1 className="text-2xl font-black text-white italic uppercase tracking-tighter">Painel Root</h1>
-        <p className="text-slate-400 text-sm">Controle total do ecossistema TripPlanner.</p>
+        <h1 className="text-2xl font-semibold text-foreground">Painel de administração</h1>
+        <p className="text-muted-foreground text-sm">Área reservada para administradores globais.</p>
     </div>
 );
 

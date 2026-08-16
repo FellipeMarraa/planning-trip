@@ -2,16 +2,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/config/firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-
-export interface Activity {
-    id: string;
-    tripId: string;
-    dateId: string;
-    time: string;
-    location: string;
-    description: string;
-    completed: boolean;
-}
+import type { Activity } from '@/types';
 
 export function useActivities(tripId: string) {
     const [activities, setActivities] = useState<Activity[]>([]);

@@ -1,7 +1,6 @@
 // src/components/trip/CreateTripDialog.tsx
 import { useState } from 'react';
-import { db } from '@/config/firebase.ts';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { createTrip } from '@/services/trips';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import {
@@ -21,13 +20,14 @@ import {
     SelectValue
 } from "@/components/ui/select";
 import { Plane, Calendar as CalendarIcon, Wallet2 } from "lucide-react";
+import { CURRENCIES, type CurrencyCode } from "@/lib/currencies";
 
 interface CreateTripDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-type BaseCurrency = 'EUR' | 'GBP' | 'USD' | 'BRL';
+type BaseCurrency = CurrencyCode;
 
 export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialogProps) {
     const { user } = useAuth();
@@ -46,26 +46,18 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
 
         setLoading(true);
         try {
-            await addDoc(collection(db, 'trips'), {
+            await createTrip({
                 name: formData.name,
                 startDate: formData.startDate,
                 endDate: formData.endDate,
                 ownerId: user.uid,
-                participants: [user.uid],
-                roles: { [user.uid]: 'ADM_TRIP' },
                 baseCurrency: formData.baseCurrency,
-                exchangeRates: {
-                    'EUR': 6.12,
-                    'GBP': 7.34,
-                    'USD': 5.45
-                },
-                createdAt: serverTimestamp()
             });
 
             onOpenChange(false);
             setFormData({ name: '', startDate: '', endDate: '', baseCurrency: 'EUR' });
         } catch (error) {
-            console.error("Erro ao gravar viagem:", error);
+            console.error("Erro ao criar viagem:", error);
         } finally {
             setLoading(false);
         }
@@ -73,60 +65,53 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            {/*
-               Mudança principal: Fundo Branco (White) com anel de borda Slate-200.
-               Arredondamento reduzido para 2xl (mais sóbrio).
-            */}
-            <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-[420px] w-[95vw] p-0 overflow-hidden rounded-2xl shadow-2xl shadow-slate-200/50 border-none ring-1 ring-slate-200">
+            <DialogContent className="max-w-[420px] w-[95vw] p-0 overflow-hidden rounded-3xl">
                 <form onSubmit={handleSubmit}>
 
-                    {/* Header: Off-white sutil (Slate-50) para separação visual elegante */}
-                    <DialogHeader className="p-6 pb-5 border-b border-slate-100 bg-slate-50/50">
+                    <DialogHeader className="p-6 pb-5 border-b border-border bg-muted/40">
                         <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-blue-600 rounded-xl shadow-md shadow-blue-100">
-                                <Plane className="w-5 h-5 text-white -rotate-45" />
+                            <div className="p-2.5 bg-primary rounded-xl shadow-sm">
+                                <Plane className="w-5 h-5 text-primary-foreground -rotate-45" />
                             </div>
                             <div>
-                                <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">Configurar Viagem</DialogTitle>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.15em] mt-0.5">Parâmetros iniciais do roteiro</p>
+                                <DialogTitle className="text-lg font-semibold tracking-tight text-foreground">Nova viagem</DialogTitle>
+                                <p className="text-sm text-muted-foreground mt-0.5">Defina o básico para começar a planejar</p>
                             </div>
                         </div>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-6">
-                        {/* Campo: Nome */}
+                    <div className="p-6 space-y-5">
                         <div className="space-y-2">
-                            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5">Destino ou Título</Label>
+                            <Label className="text-sm font-medium text-muted-foreground">Destino ou título</Label>
                             <Input
-                                placeholder="Ex: Eurotrip Primavera"
-                                className="bg-white border-slate-200 h-11 text-sm rounded-lg focus-visible:ring-blue-600/20 focus-visible:border-blue-600 transition-all placeholder:text-slate-300"
+                                placeholder="Ex: Eurotrip de primavera"
+                                className="h-11 rounded-lg"
                                 value={formData.name}
                                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                                 required
                             />
                         </div>
 
-                        {/* Grid: Datas */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5 flex items-center gap-1.5">
-                                    <CalendarIcon className="w-3 h-3" /> Partida
+                                <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                    <CalendarIcon className="w-3.5 h-3.5" /> Ida
                                 </Label>
                                 <Input
                                     type="date"
-                                    className="bg-white border-slate-200 text-xs h-11 rounded-lg focus-visible:ring-blue-600/20"
+                                    className="h-11 rounded-lg"
                                     value={formData.startDate}
                                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
                                     required
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5 flex items-center gap-1.5">
-                                    <CalendarIcon className="w-3 h-3" /> Retorno
+                                <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                    <CalendarIcon className="w-3.5 h-3.5" /> Volta
                                 </Label>
                                 <Input
                                     type="date"
-                                    className="bg-white border-slate-200 text-xs h-11 rounded-lg focus-visible:ring-blue-600/20"
+                                    className="h-11 rounded-lg"
                                     value={formData.endDate}
                                     onChange={(e) => setFormData({...formData, endDate: e.target.value})}
                                     required
@@ -134,47 +119,42 @@ export default function CreateTripDialog({ open, onOpenChange }: CreateTripDialo
                             </div>
                         </div>
 
-                        {/* Campo: Moeda Principal */}
                         <div className="space-y-2">
-                            <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 ml-0.5 flex items-center gap-1.5">
-                                <Wallet2 className="w-3 h-3" /> Moeda de Referência
+                            <Label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                <Wallet2 className="w-3.5 h-3.5" /> Moeda de referência
                             </Label>
                             <Select
                                 value={formData.baseCurrency}
-                                onValueChange={(v: string) => {
-                                    setFormData({ ...formData, baseCurrency: v as BaseCurrency });
-                                }}
+                                onValueChange={(v: string) => setFormData({ ...formData, baseCurrency: v as BaseCurrency })}
                             >
-                                <SelectTrigger className="w-full bg-white border-slate-200 h-11 text-xs rounded-lg focus:ring-blue-600/20">
+                                <SelectTrigger className="w-full h-11 rounded-lg">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-white border-slate-200 rounded-lg shadow-xl">
-                                    <SelectItem value="EUR" className="text-xs">Euro (€)</SelectItem>
-                                    <SelectItem value="GBP" className="text-xs">Libra (£)</SelectItem>
-                                    <SelectItem value="USD" className="text-xs">Dólar ($)</SelectItem>
-                                    <SelectItem value="BRL" className="text-xs">Real (R$)</SelectItem>
+                                <SelectContent className="rounded-lg">
+                                    {CURRENCIES.map((c) => (
+                                        <SelectItem key={c.code} value={c.code} className="text-xs">{c.label} ({c.symbol})</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
-                            <p className="text-[10px] text-slate-400 italic ml-1">* Todos os gastos serão consolidados nesta moeda.</p>
+                            <p className="text-xs text-muted-foreground">Os gastos serão consolidados em reais a partir desta moeda.</p>
                         </div>
                     </div>
 
-                    {/* Footer: Cinza claro (Slate-50) para um fechamento limpo */}
-                    <DialogFooter className="p-6 bg-slate-50/80 border-t border-slate-100 flex flex-row gap-3">
+                    <DialogFooter className="p-6 flex flex-row gap-3">
                         <Button
                             type="button"
                             variant="ghost"
                             onClick={() => onOpenChange(false)}
-                            className="flex-1 h-11 text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"
+                            className="flex-1 h-11 rounded-lg"
                         >
                             Cancelar
                         </Button>
                         <Button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 h-11 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold uppercase tracking-widest rounded-lg shadow-md transition-all active:scale-[0.97]"
+                            className="flex-1 h-11 rounded-lg shadow-sm"
                         >
-                            {loading ? "Processando..." : "Confirmar"}
+                            {loading ? "Criando..." : "Criar viagem"}
                         </Button>
                     </DialogFooter>
                 </form>

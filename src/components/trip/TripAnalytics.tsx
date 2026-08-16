@@ -1,13 +1,22 @@
 // src/components/trip/TripAnalytics.tsx
 import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart as PieChartIcon } from 'lucide-react';
+import { SectionHeader } from '@/components/common/section-header';
+import { EmptyState } from '@/components/common/empty-state';
 import type { Expense } from '@/types';
 
 interface TripAnalyticsProps {
     expenses: Expense[];
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f472b6'];
+const COLORS = [
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+];
 
 export default function TripAnalytics({ expenses }: TripAnalyticsProps) {
 
@@ -30,13 +39,7 @@ export default function TripAnalytics({ expenses }: TripAnalyticsProps) {
     }, [expenses]);
 
     if (!expenses || expenses.length === 0) {
-        return (
-            <div className="bg-white/[0.02] border border-dashed border-white/10 rounded-[32px] p-12 text-center">
-                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.2em]">
-                    Aguardando dados para análise de categorias
-                </p>
-            </div>
-        );
+        return <EmptyState icon={PieChartIcon} message="Aguardando gastos para gerar a análise" className="rounded-3xl" />;
     }
 
     const formatBRL = (value: any) => {
@@ -48,24 +51,20 @@ export default function TripAnalytics({ expenses }: TripAnalyticsProps) {
     };
 
     return (
-        <div className="bg-white/[0.02] border border-white/5 rounded-[32px] p-8 shadow-2xl">
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-10 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                Composição de Gastos por Categoria
-            </h3>
+        <div className="bg-card border border-border rounded-3xl p-8">
+            <SectionHeader className="mb-8">Gastos por categoria</SectionHeader>
 
-            <div className="flex flex-col md:flex-row items-center justify-between gap-12">
-                {/* Lado Esquerdo: Gráfico Maior e Limpo */}
-                <div className="w-full md:w-1/2 h-[300px] flex items-center justify-center relative">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+                <div className="w-full md:w-1/2 h-[280px] flex items-center justify-center relative">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
                                 data={categoryData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={85}
-                                outerRadius={110}
-                                paddingAngle={10}
+                                innerRadius={80}
+                                outerRadius={105}
+                                paddingAngle={6}
                                 dataKey="value"
                                 stroke="none"
                             >
@@ -79,45 +78,43 @@ export default function TripAnalytics({ expenses }: TripAnalyticsProps) {
                             </Pie>
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#0f172a',
-                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    backgroundColor: 'var(--popover)',
+                                    border: '1px solid var(--border)',
                                     borderRadius: '12px',
-                                    fontSize: '11px',
-                                    color: '#fff'
+                                    fontSize: '12px',
+                                    color: 'var(--popover-foreground)'
                                 }}
-                                itemStyle={{ color: '#fff' }}
+                                itemStyle={{ color: 'var(--popover-foreground)' }}
                                 formatter={(value) => formatBRL(value)}
                             />
                         </PieChart>
                     </ResponsiveContainer>
 
-                    {/* Texto Central do Donut */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Total</span>
-                        <span className="text-xl font-medium text-white tracking-tighter">
+                        <span className="text-xs text-muted-foreground">Total</span>
+                        <span className="text-xl font-semibold text-foreground tracking-tight">
                             {formatBRL(categoryData.reduce((acc, curr) => acc + curr.value, 0))}
                         </span>
                     </div>
                 </div>
 
-                {/* Lado Direito: Legenda de Alto Nível */}
-                <div className="w-full md:w-1/2 space-y-4">
+                <div className="w-full md:w-1/2 space-y-3.5">
                     {categoryData.map((entry, index) => (
                         <div key={entry.name} className="flex items-center justify-between group">
                             <div className="flex items-center gap-3">
                                 <div
-                                    className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+                                    className="w-2.5 h-2.5 rounded-full"
                                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                                 />
-                                <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors">
+                                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                                     {entry.name}
                                 </span>
                             </div>
                             <div className="text-right">
-                                <p className="text-xs font-bold text-white tabular-nums tracking-tight">
+                                <p className="text-sm font-semibold text-foreground tabular-nums">
                                     {formatBRL(entry.value)}
                                 </p>
-                                <p className="text-[9px] font-bold text-slate-600 tabular-nums uppercase">
+                                <p className="text-xs text-muted-foreground tabular-nums">
                                     {entry.percent}%
                                 </p>
                             </div>
