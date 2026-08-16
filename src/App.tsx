@@ -1,6 +1,6 @@
 // src/App.tsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Layout from './components/layout/Layout';
@@ -18,6 +18,7 @@ const GlobalAdminPlaceholder = () => (
 
 const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode, roleRequired?: 'GLOBAL' }) => {
     const { user, loading, isGlobalAdmin } = useAuth();
+    const location = useLocation();
 
     if (loading) {
         return (
@@ -27,7 +28,7 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
         );
     }
 
-    if (!user) return <Navigate to="/login" replace />;
+    if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
 
     if (roleRequired === 'GLOBAL' && !isGlobalAdmin) {
         return <Navigate to="/" replace />;
@@ -42,9 +43,13 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
+    const location = useLocation();
 
     if (loading) return null;
-    if (user) return <Navigate to="/" replace />;
+    if (user) {
+        const from = (location.state as { from?: { pathname: string; search?: string } } | null)?.from;
+        return <Navigate to={from ? `${from.pathname}${from.search || ''}` : '/'} replace />;
+    }
 
     return <>{children}</>;
 };
