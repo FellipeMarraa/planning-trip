@@ -42,6 +42,15 @@ service cloud.firestore {
           request.resource.data.roles[request.auth.uid] in ['EDITOR', 'VIEWER'] &&
           request.resource.data.roles.diff(resource.data.roles).affectedKeys().hasOnly([request.auth.uid]) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'roles'])
+        ) || (
+          // Sair da viagem: qualquer participante (exceto o dono) pode remover a si mesmo
+          request.auth.uid in resource.data.participants &&
+          request.auth.uid != resource.data.ownerId &&
+          !(request.auth.uid in request.resource.data.participants) &&
+          resource.data.participants.hasAll(request.resource.data.participants) &&
+          request.resource.data.participants.size() == resource.data.participants.size() - 1 &&
+          !(request.auth.uid in request.resource.data.roles) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'roles'])
         )
       );
 

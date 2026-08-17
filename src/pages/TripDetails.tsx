@@ -26,6 +26,7 @@ import { ExpenseTable, type ExpenseSortKey, type SortDirection } from "@/compone
 import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsModal";
 import {
     Calendar,
+    LogOut,
     Map,
     MoreHorizontal,
     Pencil,
@@ -69,6 +70,7 @@ export default function TripDetails() {
     const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
     const [expenseToView, setExpenseToView] = useState<Expense | null>(null);
     const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
+    const [isLeaveTripOpen, setIsLeaveTripOpen] = useState(false);
     const [isEditTripOpen, setIsEditTripOpen] = useState(false);
 
     const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -86,7 +88,7 @@ export default function TripDetails() {
     const { showError, showSuccess } = useToast();
     const { trip, expenses, loading, error } = useTrip(tripId || '');
     const { rates: currentRates } = useExchange();
-    const { canEdit } = useTripRole(trip);
+    const { role, canEdit, isOwner } = useTripRole(trip);
     const { settlements } = useSettlements(tripId || '');
     const balances = useTripBalances(trip?.participants || [], expenses, settlements);
     // Busca única dos perfis, compartilhada com todos os componentes da página
@@ -176,6 +178,17 @@ export default function TripDetails() {
         } catch (err) {
             console.error("Erro ao excluir viagem:", err);
             showError("Não foi possível excluir a viagem. Tente novamente.");
+        }
+    };
+
+    const handleLeaveTrip = async () => {
+        if (!tripId || !user?.uid) return;
+        try {
+            await removeMember(tripId, user.uid);
+            navigate('/');
+        } catch (err) {
+            console.error("Erro ao sair da viagem:", err);
+            showError("Não foi possível sair da viagem. Tente novamente.");
         }
     };
 
@@ -287,7 +300,7 @@ export default function TripDetails() {
                     <span className="text-foreground font-medium">{trip?.name}</span>
                 </nav>
 
-                {canEdit && (
+                {role && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button aria-label="Gerenciar viagem" className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors outline-none">
@@ -296,19 +309,31 @@ export default function TripDetails() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuLabel>Gerenciar viagem</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => setIsEditTripOpen(true)}>
-                                <Pencil className="w-4 h-4 mr-2 text-primary" /> Editar viagem
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => copyInviteLink('EDITOR')}>
-                                <Share2 className="w-4 h-4 mr-2 text-primary" /> Convidar editor
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => copyInviteLink('VIEWER')}>
-                                <Share2 className="w-4 h-4 mr-2 text-chart-2" /> Convidar visualizador
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem variant="destructive" onClick={() => setIsDeleteTripOpen(true)}>
-                                <Trash2 className="w-4 h-4 mr-2" /> Excluir viagem
-                            </DropdownMenuItem>
+                            {canEdit && (
+                                <>
+                                    <DropdownMenuItem onClick={() => setIsEditTripOpen(true)}>
+                                        <Pencil className="w-4 h-4 mr-2 text-primary" /> Editar viagem
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => copyInviteLink('EDITOR')}>
+                                        <Share2 className="w-4 h-4 mr-2 text-primary" /> Convidar editor
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => copyInviteLink('VIEWER')}>
+                                        <Share2 className="w-4 h-4 mr-2 text-chart-2" /> Convidar visualizador
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem variant="destructive" onClick={() => setIsDeleteTripOpen(true)}>
+                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir viagem
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            {!isOwner && (
+                                <>
+                                    {canEdit && <DropdownMenuSeparator />}
+                                    <DropdownMenuItem variant="destructive" onClick={() => setIsLeaveTripOpen(true)}>
+                                        <LogOut className="w-4 h-4 mr-2" /> Sair da viagem
+                                    </DropdownMenuItem>
+                                </>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
@@ -508,6 +533,22 @@ export default function TripDetails() {
                     <AlertDialogFooter className="gap-3 mt-4">
                         <AlertDialogCancel className="rounded-xl h-11 flex-1">Cancelar</AlertDialogCancel>
                         <AlertDialogAction variant="destructive" onClick={handleDeleteTrip} className="rounded-xl h-11 flex-1">Excluir viagem</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isLeaveTripOpen} onOpenChange={setIsLeaveTripOpen}>
+                <AlertDialogContent className="rounded-3xl max-w-[420px] border-destructive/30">
+                    <AlertDialogHeader>
+                        <LogOut className="w-12 h-12 text-destructive mb-2 mx-auto" />
+                        <AlertDialogTitle className="text-foreground text-center">Sair da viagem?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-center">
+                            Você deixará de ter acesso a esta viagem. Para voltar, será preciso um novo convite.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-3 mt-4">
+                        <AlertDialogCancel className="rounded-xl h-11 flex-1">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={handleLeaveTrip} className="rounded-xl h-11 flex-1">Sair da viagem</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
