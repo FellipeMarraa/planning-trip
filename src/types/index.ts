@@ -14,7 +14,7 @@ export interface Trip {
     endDate: string;
     ownerId: string;
     participants: string[]; // Array de UIDs dos usuários (Ex: você e sua esposa) — inclui uids fantasma (ghost_*)
-    baseCurrencies: string[]; // Ex: ['EUR', 'GBP']
+    baseCurrency: string; // Moeda de referência da viagem (ex: 'EUR', 'BRL')
     exchangeRates: { [key: string]: number };
     createdAt: number;
     roles: {

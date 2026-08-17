@@ -10,7 +10,9 @@ import { useSettlements } from '@/hooks/useSettlements';
 import { useTripBalances } from '@/hooks/useTripBalances';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
 import { isGhostUid } from '@/lib/members';
+import { cn } from '@/lib/utils';
 import { addGhostMember, changeMemberRole, deleteTripCascade, linkGhostToUser, removeMember, renameGhostMember } from '@/services/trips';
+import { createInvite } from '@/services/invites';
 import { deleteExpense } from '@/services/expenses';
 import { createSettlement, deleteSettlement } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
@@ -81,7 +83,7 @@ export default function TripDetails() {
     const [memberToInspect, setMemberToInspect] = useState<string | null>(null);
 
     const { user } = useAuth();
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
     const { trip, expenses, loading, error } = useTrip(tripId || '');
     const { rates: currentRates } = useExchange();
     const { canEdit } = useTripRole(trip);
@@ -135,6 +137,8 @@ export default function TripDetails() {
     }, [expenses, currentRates]);
 
     const variacao = totalBRLRealizado > 0 ? ((totalBRLMercado / totalBRLRealizado - 1) * 100) : 0;
+    // Viagem com referência em BRL: comparação de cotação não faz sentido.
+    const isDomesticBRL = trip?.baseCurrency === 'BRL';
 
     const totalPages = Math.ceil(sortedExpenses.length / itemsPerPage);
     const paginatedExpenses = sortedExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -191,10 +195,17 @@ export default function TripDetails() {
         }
     };
 
-    const copyInviteLink = (role: 'editor' | 'viewer') => {
-        const url = `${window.location.origin}/join/${tripId}/${role}`;
-        navigator.clipboard.writeText(url);
-        alert(`Link de convite para ${role === 'editor' ? 'editor' : 'visualizador'} copiado!`);
+    const copyInviteLink = async (role: 'EDITOR' | 'VIEWER') => {
+        if (!tripId || !user?.uid) return;
+        try {
+            const inviteId = await createInvite(tripId, role, user.uid);
+            const url = `${window.location.origin}/join/${inviteId}`;
+            await navigator.clipboard.writeText(url);
+            showSuccess(`Link de convite para ${role === 'EDITOR' ? 'editor' : 'visualizador'} copiado!`);
+        } catch (error) {
+            console.error("Erro ao criar convite:", error);
+            showError("Não foi possível gerar o link de convite.");
+        }
     };
 
     const handleChangeRole = async (uid: string, newRole: Exclude<UserRole, 'OWNER'>) => {
@@ -288,10 +299,10 @@ export default function TripDetails() {
                             <DropdownMenuItem onClick={() => setIsEditTripOpen(true)}>
                                 <Pencil className="w-4 h-4 mr-2 text-primary" /> Editar viagem
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => copyInviteLink('editor')}>
+                            <DropdownMenuItem onClick={() => copyInviteLink('EDITOR')}>
                                 <Share2 className="w-4 h-4 mr-2 text-primary" /> Convidar editor
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => copyInviteLink('viewer')}>
+                            <DropdownMenuItem onClick={() => copyInviteLink('VIEWER')}>
                                 <Share2 className="w-4 h-4 mr-2 text-chart-2" /> Convidar visualizador
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -343,27 +354,31 @@ export default function TripDetails() {
                 />
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className={cn("grid grid-cols-1 gap-4", !isDomesticBRL && "sm:grid-cols-3")}>
                 <StatCard
                     label="Total desembolsado"
                     value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalBRLRealizado)}
                     hint="Base acumulada com taxas"
                     accent="primary"
                 />
-                <StatCard
-                    label="Cotação comercial"
-                    value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalBRLMercado)}
-                    hint="Câmbio atualizado agora"
-                    pulse
-                    className="bg-muted/40"
-                />
-                <StatCard
-                    label="Eficiência cambial"
-                    value={totalBRLRealizado > 0 ? `${variacao > 0 ? '+' : ''}${variacao.toFixed(2)}%` : '0,00%'}
-                    hint="vs. câmbio comercial"
-                    valueClassName={totalBRLRealizado > 0 ? (variacao > 0 ? 'text-destructive' : 'text-chart-2') : 'text-muted-foreground'}
-                    icon={totalBRLRealizado > 0 ? (variacao > 0 ? TrendingUp : TrendingDown) : undefined}
-                />
+                {!isDomesticBRL && (
+                    <>
+                        <StatCard
+                            label="Cotação comercial"
+                            value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalBRLMercado)}
+                            hint="Câmbio atualizado agora"
+                            pulse
+                            className="bg-muted/40"
+                        />
+                        <StatCard
+                            label="Eficiência cambial"
+                            value={totalBRLRealizado > 0 ? `${variacao > 0 ? '+' : ''}${variacao.toFixed(2)}%` : '0,00%'}
+                            hint="vs. câmbio comercial"
+                            valueClassName={totalBRLRealizado > 0 ? (variacao > 0 ? 'text-destructive' : 'text-chart-2') : 'text-muted-foreground'}
+                            icon={totalBRLRealizado > 0 ? (variacao > 0 ? TrendingUp : TrendingDown) : undefined}
+                        />
+                    </>
+                )}
             </div>
 
             <TripAnalytics expenses={expenses} />
@@ -400,6 +415,7 @@ export default function TripDetails() {
                     currentPage={currentPage}
                     totalPages={totalPages}
                     currentRates={currentRates}
+                    isDomesticBRL={isDomesticBRL}
                     sortKey={sortKey}
                     sortDirection={sortDirection}
                     onSort={handleSort}

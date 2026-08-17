@@ -71,6 +71,14 @@ service cloud.firestore {
       allow delete: if canEdit(resource.data.tripId) || resource.data.to == request.auth.uid;
     }
 
+    match /invites/{inviteId} {
+      // Leitura por qualquer logado: o próprio ID (imprevisível, tipo token) já
+      // é o segredo — precisa saber o ID exato pra ler, não dá pra listar/adivinhar.
+      allow read: if isSignedIn();
+      allow create: if canEdit(request.resource.data.tripId);
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

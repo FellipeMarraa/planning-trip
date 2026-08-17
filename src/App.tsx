@@ -1,10 +1,9 @@
 // src/App.tsx
 import React, { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import Layout from './components/layout/Layout';
-import { consumePostLoginRedirect, savePostLoginRedirect } from './lib/postLoginRedirect';
 
 // Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
@@ -34,8 +33,11 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
     if (loading) return <PageLoader />;
 
     if (!user) {
-        savePostLoginRedirect(location.pathname + location.search);
-        return <Navigate to="/login" replace />;
+        // Destino vai na URL (query param), não em sessionStorage/location.state —
+        // sobrevive a qualquer combinação de popup/reload/modo privado sem depender
+        // de storage do navegador.
+        const redirectTo = encodeURIComponent(location.pathname + location.search);
+        return <Navigate to={`/login?redirect=${redirectTo}`} replace />;
     }
 
     if (roleRequired === 'GLOBAL' && !isGlobalAdmin) {
@@ -51,10 +53,12 @@ const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode,
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
+    const [searchParams] = useSearchParams();
 
     if (loading) return null;
     if (user) {
-        return <Navigate to={consumePostLoginRedirect() || '/'} replace />;
+        const redirectTo = searchParams.get('redirect');
+        return <Navigate to={redirectTo ? decodeURIComponent(redirectTo) : '/'} replace />;
     }
 
     return <>{children}</>;
@@ -96,7 +100,7 @@ export default function App() {
                     } />
 
                     {/* Rota de Convite */}
-                    <Route path="/join/:tripId/:role" element={
+                    <Route path="/join/:inviteId" element={
                         <ProtectedRoute>
                             <JoinTrip />
                         </ProtectedRoute>

@@ -56,6 +56,7 @@ interface UpdateTripInput {
     name: string;
     startDate: string;
     endDate: string;
+    baseCurrency: string;
 }
 
 export async function updateTripDetails(tripId: string, input: UpdateTripInput) {
@@ -63,6 +64,7 @@ export async function updateTripDetails(tripId: string, input: UpdateTripInput) 
         name: input.name,
         startDate: input.startDate,
         endDate: input.endDate,
+        baseCurrency: input.baseCurrency,
     });
 }
 

@@ -20,6 +20,7 @@ interface ExpenseTableProps {
     currentPage: number;
     totalPages: number;
     currentRates: Record<string, number>;
+    isDomesticBRL: boolean;
     sortKey: ExpenseSortKey | null;
     sortDirection: SortDirection;
     onSort: (key: ExpenseSortKey) => void;
@@ -32,7 +33,7 @@ interface ExpenseTableProps {
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
+export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, isDomesticBRL, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
     const SortableHeader = ({ column, label, align }: { column: ExpenseSortKey; label: string; align?: 'right' }) => (
         <th className={cn("px-6 py-3 font-medium", align === 'right' && "text-right")}>
             <button
@@ -103,9 +104,11 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                                     <span className="text-sm font-semibold text-foreground tabular-nums">
                                         {formatBRL(expense.amountBRL)}
                                     </span>
-                                    <p className="text-xs text-muted-foreground tabular-nums">
-                                        Hoje: {formatBRL(expense.amountOriginal * (currentRates[expense.currency] || 0))}
-                                    </p>
+                                    {!isDomesticBRL && expense.currency !== 'BRL' && (
+                                        <p className="text-xs text-muted-foreground tabular-nums">
+                                            Hoje: {formatBRL(expense.amountOriginal * (currentRates[expense.currency] || 0))}
+                                        </p>
+                                    )}
                                 </td>
                                 {canEdit && (
                                     <td className="px-6 py-4 text-right whitespace-nowrap">

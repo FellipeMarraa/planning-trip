@@ -133,6 +133,14 @@ html, body, #root {
   html {
     @apply font-sans;
     }
+  /* Navegadores mostram cursor padrão (não a mãozinha) em <button> por padrão
+     — só <a> tem cursor:pointer nativo. Aplica em todo botão clicável do app. */
+  button:not(:disabled) {
+    cursor: pointer;
+    }
+  button:disabled {
+    cursor: not-allowed;
+    }
 }
 
 @layer utilities {
