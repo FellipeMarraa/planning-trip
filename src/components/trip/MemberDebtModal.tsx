@@ -1,7 +1,8 @@
 // src/components/trip/MemberDebtModal.tsx
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MoneyInput } from "@/components/common/money-input";
 import { getMemberName } from "@/lib/members";
 import { useAuth } from "@/context/AuthContext";
 import { Scale, Trash2 } from "lucide-react";
@@ -37,6 +38,19 @@ const formatBRL = (value: number) =>
 
 export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid, expenses, settlements, onSettle, onDeleteSettlement, canEdit }: MemberDebtModalProps) {
     const { user } = useAuth();
+    const [settlingKey, setSettlingKey] = useState<string | null>(null);
+    const [settleAmount, setSettleAmount] = useState(0);
+
+    const startSettle = (key: string, maxAmount: number) => {
+        setSettlingKey(key);
+        setSettleAmount(maxAmount);
+    };
+
+    const confirmSettle = (from: string, to: string, maxAmount: number) => {
+        const amount = Math.min(Math.max(settleAmount, 0.01), maxAmount);
+        onSettle(from, to, amount);
+        setSettlingKey(null);
+    };
 
     const relatedSettlements = useMemo(
         () => settlements.filter((s) => s.from === memberUid || s.to === memberUid),
@@ -110,12 +124,30 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                 <p className="text-sm text-foreground">{getMemberName(group.uid, trip, profiles)}</p>
                                                 <p className="text-sm font-semibold text-destructive tabular-nums">{formatBRL(group.total)}</p>
                                             </div>
-                                            {user?.uid === group.uid && (
-                                                <Button size="sm" variant="outline" onClick={() => onSettle(memberUid, group.uid, group.total)}>
-                                                    Marquei como recebido
-                                                </Button>
+                                            {canEdit && user?.uid === group.uid && (
+                                                settlingKey === `debt-${group.uid}` ? null : (
+                                                    <Button size="sm" variant="outline" onClick={() => startSettle(`debt-${group.uid}`, group.total)}>
+                                                        Registrar pagamento
+                                                    </Button>
+                                                )
                                             )}
                                         </div>
+                                        {canEdit && user?.uid === group.uid && settlingKey === `debt-${group.uid}` && (
+                                            <div className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border">
+                                                <MoneyInput
+                                                    value={settleAmount}
+                                                    onValueChange={setSettleAmount}
+                                                    prefix="R$"
+                                                    className="h-9 text-sm"
+                                                />
+                                                <Button size="sm" className="h-9 flex-shrink-0" onClick={() => confirmSettle(memberUid, group.uid, group.total)}>
+                                                    Confirmar
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-9 flex-shrink-0" onClick={() => setSettlingKey(null)}>
+                                                    Cancelar
+                                                </Button>
+                                            </div>
+                                        )}
                                         <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-none">
                                             {group.items.map((item, idx) => (
                                                 <div key={`${item.expenseId}-${idx}`} className="flex items-center justify-between gap-2 text-xs text-muted-foreground pl-1 border-l-2 border-border">
@@ -143,12 +175,30 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                 <p className="text-sm text-foreground">{getMemberName(group.uid, trip, profiles)}</p>
                                                 <p className="text-sm font-semibold text-chart-2 tabular-nums">{formatBRL(group.total)}</p>
                                             </div>
-                                            {user?.uid === memberUid && (
-                                                <Button size="sm" variant="outline" onClick={() => onSettle(group.uid, memberUid, group.total)}>
-                                                    Marquei como recebido
-                                                </Button>
+                                            {canEdit && user?.uid === memberUid && (
+                                                settlingKey === `credit-${group.uid}` ? null : (
+                                                    <Button size="sm" variant="outline" onClick={() => startSettle(`credit-${group.uid}`, group.total)}>
+                                                        Registrar pagamento
+                                                    </Button>
+                                                )
                                             )}
                                         </div>
+                                        {canEdit && user?.uid === memberUid && settlingKey === `credit-${group.uid}` && (
+                                            <div className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border">
+                                                <MoneyInput
+                                                    value={settleAmount}
+                                                    onValueChange={setSettleAmount}
+                                                    prefix="R$"
+                                                    className="h-9 text-sm"
+                                                />
+                                                <Button size="sm" className="h-9 flex-shrink-0" onClick={() => confirmSettle(group.uid, memberUid, group.total)}>
+                                                    Confirmar
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="h-9 flex-shrink-0" onClick={() => setSettlingKey(null)}>
+                                                    Cancelar
+                                                </Button>
+                                            </div>
+                                        )}
                                         <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-none">
                                             {group.items.map((item, idx) => (
                                                 <div key={`${item.expenseId}-${idx}`} className="flex items-center justify-between gap-2 text-xs text-muted-foreground pl-1 border-l-2 border-border">
@@ -176,7 +226,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                             <span className="text-foreground">{getMemberName(s.to, trip, profiles)}</span>
                                             <span className="tabular-nums"> · {formatBRL(s.amount)}</span>
                                         </p>
-                                        {(canEdit || user?.uid === s.to) && (
+                                        {canEdit && (
                                             <button
                                                 type="button"
                                                 onClick={() => onDeleteSettlement(s.id)}
