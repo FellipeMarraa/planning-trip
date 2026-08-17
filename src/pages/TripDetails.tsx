@@ -11,7 +11,7 @@ import { useTripBalances } from '@/hooks/useTripBalances';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
 import { isGhostUid } from '@/lib/members';
 import { cn } from '@/lib/utils';
-import { addGhostMember, changeMemberRole, deleteTripCascade, linkGhostToUser, removeMember, renameGhostMember } from '@/services/trips';
+import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember } from '@/services/trips';
 import { createInvite } from '@/services/invites';
 import { deleteExpense } from '@/services/expenses';
 import { createSettlement, deleteSettlement } from '@/services/settlements';
@@ -142,6 +142,14 @@ export default function TripDetails() {
     // Viagem com referência em BRL: comparação de cotação não faz sentido.
     const isDomesticBRL = trip?.baseCurrency === 'BRL';
 
+    // Se o usuário aparece em alguma despesa/acerto, sair "de vez" deixaria
+    // dívidas/créditos órfãos — nesse caso ele é substituído por um fantasma.
+    const hasFinancialFootprint = useMemo(() => {
+        if (!user?.uid) return false;
+        return expenses.some((exp) => exp.paidBy === user.uid || (exp.participants || []).includes(user.uid))
+            || settlements.some((s) => s.from === user.uid || s.to === user.uid);
+    }, [expenses, settlements, user?.uid]);
+
     const totalPages = Math.ceil(sortedExpenses.length / itemsPerPage);
     const paginatedExpenses = sortedExpenses.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -184,7 +192,12 @@ export default function TripDetails() {
     const handleLeaveTrip = async () => {
         if (!tripId || !user?.uid) return;
         try {
-            await removeMember(tripId, user.uid);
+            if (hasFinancialFootprint) {
+                const myName = profiles[user.uid]?.displayName || user.displayName || 'Ex-participante';
+                await leaveTripAsGhost(tripId, user.uid, myName);
+            } else {
+                await removeMember(tripId, user.uid);
+            }
             navigate('/');
         } catch (err) {
             console.error("Erro ao sair da viagem:", err);
@@ -543,7 +556,9 @@ export default function TripDetails() {
                         <LogOut className="w-12 h-12 text-destructive mb-2 mx-auto" />
                         <AlertDialogTitle className="text-foreground text-center">Sair da viagem?</AlertDialogTitle>
                         <AlertDialogDescription className="text-center">
-                            Você deixará de ter acesso a esta viagem. Para voltar, será preciso um novo convite.
+                            {hasFinancialFootprint
+                                ? "Você deixará de ter acesso a esta viagem. Como você tem despesas ou acertos registrados, seu nome será mantido como convidado (sem login) para preservar dívidas e saldos. Para voltar, será preciso um novo convite."
+                                : "Você deixará de ter acesso a esta viagem. Para voltar, será preciso um novo convite."}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-3 mt-4">

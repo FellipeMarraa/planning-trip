@@ -153,6 +153,61 @@ export async function linkGhostToUser(tripId: string, ghostUid: string, realUid:
     }
 }
 
+export async function leaveTripAsGhost(tripId: string, uid: string, displayName: string) {
+    // Sai da viagem preservando o histórico financeiro: em vez de sumir, o
+    // participante é substituído por um fantasma em toda despesa/acerto onde
+    // aparecia, mantendo dívidas/créditos intactos para os demais membros.
+    const ghostUid = `ghost_${crypto.randomUUID()}`;
+    const tripRef = doc(db, 'trips', tripId);
+
+    const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('tripId', '==', tripId)));
+    const expensesToMigrate = expensesSnap.docs.filter((expenseDoc) => {
+        const data = expenseDoc.data();
+        const participants: string[] = data.participants || [];
+        return data.paidBy === uid || participants.includes(uid);
+    });
+    for (const batchDocs of chunk(expensesToMigrate, BATCH_LIMIT)) {
+        const batch = writeBatch(db);
+        batchDocs.forEach((expenseDoc) => {
+            const data = expenseDoc.data();
+            const participants: string[] = data.participants || [];
+            batch.update(expenseDoc.ref, {
+                paidBy: data.paidBy === uid ? ghostUid : data.paidBy,
+                participants: participants.map((p) => (p === uid ? ghostUid : p)),
+            });
+        });
+        await batch.commit();
+    }
+
+    const settlementsSnap = await getDocs(query(collection(db, 'settlements'), where('tripId', '==', tripId)));
+    const settlementsToMigrate = settlementsSnap.docs.filter((settlementDoc) => {
+        const data = settlementDoc.data();
+        return data.from === uid || data.to === uid;
+    });
+    for (const batchDocs of chunk(settlementsToMigrate, BATCH_LIMIT)) {
+        const batch = writeBatch(db);
+        batchDocs.forEach((settlementDoc) => {
+            const data = settlementDoc.data();
+            batch.update(settlementDoc.ref, {
+                from: data.from === uid ? ghostUid : data.from,
+                to: data.to === uid ? ghostUid : data.to,
+            });
+        });
+        await batch.commit();
+    }
+
+    const tripSnap = await getDoc(tripRef);
+    if (!tripSnap.exists()) return;
+    const currentParticipants: string[] = tripSnap.data().participants || [];
+    const nextParticipants = currentParticipants.filter((p) => p !== uid).concat(ghostUid);
+
+    await updateDoc(tripRef, {
+        participants: nextParticipants,
+        [`ghosts.${ghostUid}`]: { name: displayName },
+        [`roles.${uid}`]: deleteField(),
+    });
+}
+
 export async function joinTripByInvite(tripId: string, role: string, uid: string) {
     const normalizedRole = role.toUpperCase();
     if (normalizedRole !== 'EDITOR' && normalizedRole !== 'VIEWER') {
