@@ -7,22 +7,32 @@
 ```
 GitHub (main) ──push──▶ Vercel (build automático)
                               │
-                              ▼
-                    dist/ estático (SPA, vercel.json faz o rewrite pra index.html)
+                              ├──▶ dist/ estático (SPA, vercel.json faz o rewrite pra index.html,
+                              │     exceto /api/*)
+                              │
+                              └──▶ api/ai/chat.ts ─▶ function serverless (primeira do projeto)
 
-Firebase (projeto planning-trip-6a9cb) ──▶ só Firestore (regras + dados)
-                                            sem Hosting, sem Cloud Functions (plano Spark)
+Firebase (projeto planning-trip-6a9cb) ──▶ Firestore (regras + dados)
+                                            sem Hosting, sem Cloud Functions (plano Spark) —
+                                            a function acima roda no Vercel, não no Firebase
 ```
 
 Domínio de produção: `https://planning-trip.vercel.app`.
 
 ## 2. Frontend
 
-Build: `tsc -b && vite build` (erro de tipo quebra o build, não só o lint). Deploy automático via integração Git do Vercel a cada push em `main` — não há passo manual pro frontend em si.
+Build: `tsc -b && vite build` (erro de tipo quebra o build, não só o lint). **`tsc -b` não cobre `api/`** (nenhum dos tsconfigs referenciados inclui essa pasta) — um erro de tipo em `api/*.ts` só aparece no deploy da function pelo Vercel, não no build local. Deploy automático via integração Git do Vercel a cada push em `main` — não há passo manual pro frontend em si.
 
 ## 3. Variáveis de ambiente
 
-**Não existe `.env`/`.env.example` no repositório.** A config do Firebase Web SDK (`apiKey`, `authDomain`, `projectId`...) é hardcoded em `src/config/firebase.ts` — não é segredo (é a chave pública do SDK client), mas significa que trocar de projeto Firebase exige editar esse arquivo, não uma env var. Diferente do CashZ, que usa `VITE_*`/env vars server-only — não copiar esse padrão pro planning-trip sem necessidade real (trocar de projeto Firebase não é algo que acontece com frequência aqui).
+A config do Firebase Web SDK (`apiKey`, `authDomain`, `projectId`...) continua hardcoded em `src/config/firebase.ts` — não é segredo (é a chave pública do SDK client). **Desde o assistente de IA (`api/ai/chat.ts`), o projeto passou a ter env vars de verdade** — server-only, nunca prefixadas `VITE_` (não vazam pro bundle):
+
+| Variável | Onde é usada | Prefixo `VITE_`? |
+|---|---|---|
+| `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` | Admin SDK do próprio projeto (`api/ai/chat.ts`) — mesmo JSON de service account já usado como `TRIP_FIREBASE_*` no Vercel do CashZ, adicionado aqui também | Não |
+| `GROQ_API_KEY` | Único provider de IA (`api/ai/_lib/providers/groq.ts`) — sem fallback, decisão do usuário | Não |
+
+Configuradas no Vercel do **planning-trip**, nunca no do CashZ — esse backend é próprio, não atravessa projeto (diferente do SSO/gate de plano, que precisa tocar o CashZ por natureza).
 
 ## 4. Firebase — configuração que não vive no repositório
 
@@ -43,3 +53,4 @@ Reverter pelo painel do Vercel (redeploy de um build anterior) ou `git revert` +
 1. Mudou `firestore.rules`? Rodar contra o emulator antes (ver [TESTS.md](./TESTS.md)) e fazer o deploy manual da seção 4 — o push pro Vercel não cobre isso.
 2. Mudou o formato de algum documento (`Trip`/`Expense`/`Settlement`/`Activity`)? Conferir se despesas/viagens já existentes continuam legíveis com o formato novo — não há migração automática de dado existente.
 3. Mudou algo no fluxo de SSO? Revisar também o lado do CashZ (seção 5) antes de considerar a mudança completa.
+4. Mudou algo em `api/*.ts`? Rodar `npx tsc --noEmit` manualmente nesses arquivos antes do push — `npm run build` não pega erro de tipo lá (seção 2).

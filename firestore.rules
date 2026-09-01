@@ -133,6 +133,24 @@ service cloud.firestore {
       );
     }
 
+    match /ai_threads/{threadId} {
+      // Só o backend (Admin SDK, api/ai/chat.ts) escreve — cliente só lê a
+      // própria conversa. Igual ao padrão de users/{uid} pra plan/planExpiresAt:
+      // conteúdo gerado por processo controlado, nunca aceito direto do client.
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /ai_messages/{messageId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /ai_usage/{docId} {
+      // Contador global de custo — nunca legível/gravável pelo client.
+      allow read, write: if false;
+    }
+
     match /invites/{inviteId} {
       // Leitura por qualquer logado: o próprio ID (imprevisível, tipo token) já
       // é o segredo — precisa saber o ID exato pra ler, não dá pra listar/adivinhar.

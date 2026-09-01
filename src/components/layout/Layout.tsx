@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Plane, LogOut, User as UserIcon, Settings } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
+import { AiAssistantWidget } from '@/ai/components/AiAssistantWidget';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const { user, logout, isGlobalAdmin } = useAuth();
@@ -71,6 +72,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <main className="max-w-6xl mx-auto px-6 py-10">
                 {children}
             </main>
+
+            <AiAssistantWidget />
         </div>
     );
 }

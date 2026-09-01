@@ -75,7 +75,18 @@ Nenhuma dessas migrações é atômica (comentário explícito em `linkGhostToUs
 
 `react-router-dom` v7, todas as páginas lazy-loaded (`React.lazy` + um único `Suspense` em `App.tsx`) pra não puxar Recharts/Framer Motion antes da hora. `ProtectedRoute` embrulha em `Layout`, exceto a rota de itinerário (`/trip/:tripId/itinerary`), que tem layout próprio imersivo.
 
-## 8. Convenções já validadas (siga-as)
+## 8. Assistente de IA de viagem (`api/ai/`, `src/ai/`)
+
+Primeira vez que o planning-trip tem backend próprio (antes disso, o único código server-side que tocava este projeto era o SSO no repo do CashZ — ver seção 6). Roda inteiramente dentro do próprio projeto Firebase (`planning-trip-6a9cb`), sem cruzar com o CashZ, diferente da integração de SSO/plano.
+
+- **`api/ai/chat.ts`**: único endpoint. Verifica ID token → checa plano ativo de quem está chamando (réplica de `isCashzPremium()`, ver [SECURITY.md](./SECURITY.md) seção 6) → rate limit → circuit-breaker de custo global (`api/ai/_lib/usage.ts`) → monta contexto (viagem + roteiro já cadastrado, só se o uid for participante) → gera resposta (só Groq, sem fallback — decisão do usuário; `api/ai/_lib/providers/`) → grava em `ai_threads`/`ai_messages`.
+- **Split de segurança**: a chamada real ao provider (com `GROQ_API_KEY`) só existe em `api/ai/_lib/providers/*` — nunca em `src/`. Mesmo motivo de um achado já corrigido no CashZ (chave de IA vazando no bundle do client).
+- **Tools = eager context stuffing, não function-calling nativo**: o endpoint sempre busca a viagem + atividades atuais de uma vez (se houver `tripId`) e injeta no system prompt (`api/ai/_lib/prompt.ts`) — não há um loop de "modelo pede tool → server executa → modelo continua". Mesma simplificação deliberada usada no Consultor Financeiro do CashZ.
+- **A IA nunca escreve nada sozinha.** Quando o usuário pede um roteiro, a resposta pode incluir um bloco JSON delimitado (`SUGGESTION_START`/`SUGGESTION_END`, `api/ai/_lib/prompt.ts`) que o client (`src/ai/components/SuggestedItineraryCard.tsx`) transforma em cards com botão "Adicionar" — cada clique chama `createActivity` (o mesmo service do formulário manual), nunca uma tool com permissão de escrita. Mesmo princípio permanente do CashZ ("nenhuma ferramenta de IA escreve dado"), aplicado aqui desde o início.
+- **Renderização real vem de `onSnapshot`** em `ai_messages` (`src/ai/hooks/useAIChat.ts`), não da resposta do `fetch` — a resposta só devolve o `threadId`. Mesmo padrão do CashZ.
+- **Sem `ai_config` administrável nem `ai_usage_logs`/`ai_user_limits` por usuário**: provider ativo/fallback e limites de custo são constantes hardcoded no código (`api/ai/_lib/providers/registry.ts`, `api/ai/_lib/usage.ts`) — planning-trip não tem `/admin` funcional pra editar isso em runtime (ver [PROJECT.md](./PROJECT.md) seção 6). Só existe um contador global simples (`ai_usage/global`).
+
+## 9. Convenções já validadas (siga-as)
 
 1. Ler é hook+`onSnapshot`; escrever é service. Não misturar.
 2. Migração de dado em lote sempre em chunks de 499 (`BATCH_LIMIT` em `trips.ts`), nunca um `writeBatch` sem chunking.

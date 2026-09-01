@@ -12,6 +12,9 @@
 | `activities` | auto | `services/activities.ts` | `useActivities` |
 | `users` | uid do Firebase Auth | `upsertUserProfile` (`services/users.ts`), chamado a cada login | `useUserProfiles` |
 | `invites` | auto (o próprio ID é o token do convite) | `createInvite` (`services/invites.ts`) | `getInvite`/`joinTripByInvite` |
+| `ai_threads` | auto | só `api/ai/chat.ts` (Admin SDK) | `src/ai/hooks/useAIChat.ts` (`onSnapshot`, só a própria) |
+| `ai_messages` | auto | só `api/ai/chat.ts` (Admin SDK) | `src/ai/hooks/useAIChat.ts` (`onSnapshot`, só a própria thread) |
+| `ai_usage` | fixo (`global`) | só `api/ai/_lib/usage.ts` (Admin SDK) | nunca — nem client nem regra permitem leitura |
 
 Todas as coleções são **top-level, sem subcoleção** — `expenses`/`settlements`/`activities` denormalizam `tripId` e são filtradas com `where('tripId', '==', ...)`.
 
@@ -86,6 +89,23 @@ interface InviteData { tripId: string; role: 'EDITOR' | 'VIEWER'; createdBy: str
 ```
 
 O próprio ID do documento é o segredo — imprevisível o suficiente pra servir de token de convite (ver regra em [SECURITY.md](./SECURITY.md) seção 1). `update`/`delete` são sempre negados pela regra — não existe revogação de convite hoje.
+
+### 2.7 `ai_threads` / `ai_messages`
+
+```ts
+interface AiThread { userId: string; tripId: string | null; title: string; createdAt: Timestamp; updatedAt: Timestamp; lastMessagePreview?: string; }
+interface AiMessage { threadId: string; userId: string; role: 'user' | 'assistant'; content: string; suggestedActivities?: SuggestedActivity[] | null; tripId?: string | null; provider?: string; createdAt: Timestamp; }
+```
+
+Só o `api/ai/chat.ts` escreve (Admin SDK) — client nunca escreve direto, só lê a própria conversa (`allow write: if false` pros dois em `firestore.rules`). `tripId` em `ai_threads` é opcional: `null` quando a conversa começou fora do contexto de uma viagem. `suggestedActivities`, quando presente numa mensagem do assistente, é o roteiro sugerido que ainda não foi confirmado pelo usuário — ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 8.
+
+### 2.8 `ai_usage/global`
+
+```ts
+interface AiUsageGlobal { spentUsd: number; periodStart: string; }
+```
+
+Circuit-breaker de custo mensal simples — sem leitura nem escrita liberada pro client em nenhuma hipótese (`allow read, write: if false`). Reseta quando `periodStart` não é mais do mês corrente (checado inline a cada chamada, sem cron — mesmo padrão do CashZ).
 
 ## 3. Padrão "ghost member" — impacto no dado
 

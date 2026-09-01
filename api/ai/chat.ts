@@ -1,0 +1,221 @@
+import admin from "firebase-admin";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { checkRateLimit } from "./_lib/rateLimit.js";
+import { checkUsageAllowed, calculateCostUsd, recordUsage } from "./_lib/usage.js";
+import { buildSystemPrompt, SUGGESTION_START, SUGGESTION_END, type TripContext } from "./_lib/prompt.js";
+import { generateReply } from "./_lib/providers/registry.js";
+import type { AIProviderMessage } from "./_lib/providers/types.js";
+
+if (!admin.apps.length) {
+    try {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+            }),
+        });
+    } catch (error) {
+        console.error("❌ Erro na inicialização do Admin SDK (api/ai/chat.ts):", error instanceof Error ? error.message : error);
+    }
+}
+
+const HISTORY_LIMIT = 10;
+
+// Mesmo cálculo de isCashzPremium() do firestore.rules e de useCashzPlan.ts
+// no client — nunca confia só no campo `plan` sincronizado, sempre
+// recalcula a expiração no momento do uso.
+function isPremium(plan: string | undefined, planExpiresAt: string | null | undefined): boolean {
+    if (!plan || !['premium', 'annual'].includes(plan)) return false;
+    if (!planExpiresAt) return true;
+    return new Date(planExpiresAt) > new Date();
+}
+
+interface SuggestedActivity {
+    dateId: string;
+    time: string;
+    location: string;
+    description: string;
+}
+
+// Defesa em profundidade: mesmo a IA não escrevendo nada sozinha, o texto que
+// ela gera é influenciável por prompt injection do próprio usuário. Nunca
+// confiar no shape do JSON que ela emite — cada item é reduzido só aos 4
+// campos esperados, qualquer campo extra (ex.: um `tripId` embutido pra
+// tentar redirecionar a escrita quando o client confirmar) é descartado aqui,
+// nunca chega a ser persistido em ai_messages.suggestedActivities.
+function sanitizeSuggestedActivities(parsed: unknown): SuggestedActivity[] | null {
+    if (!Array.isArray(parsed)) return null;
+
+    const sanitized = parsed
+        .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+        .map((item) => ({
+            dateId: String(item.dateId ?? ''),
+            time: String(item.time ?? ''),
+            location: String(item.location ?? ''),
+            description: String(item.description ?? ''),
+        }))
+        .filter((item) => item.dateId && item.time && item.location);
+
+    return sanitized.length > 0 ? sanitized : null;
+}
+
+function extractSuggestion(text: string): { reply: string; suggestedActivities: SuggestedActivity[] | null } {
+    const start = text.indexOf(SUGGESTION_START);
+    const end = text.indexOf(SUGGESTION_END);
+    if (start === -1 || end === -1 || end < start) {
+        return { reply: text, suggestedActivities: null };
+    }
+
+    const jsonBlock = text.slice(start + SUGGESTION_START.length, end).trim();
+    const reply = (text.slice(0, start) + text.slice(end + SUGGESTION_END.length)).trim();
+
+    try {
+        const parsed = JSON.parse(jsonBlock);
+        return { reply, suggestedActivities: sanitizeSuggestedActivities(parsed) };
+    } catch {
+        return { reply, suggestedActivities: null };
+    }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+
+    try {
+        const authHeader = req.headers.authorization || '';
+        const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (!idToken) return res.status(401).json({ message: 'Token de autenticação ausente' });
+
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const uid = decoded.uid;
+        const db = admin.firestore();
+
+        const userSnap = await db.collection('users').doc(uid).get();
+        const userData = userSnap.data();
+        if (!isPremium(userData?.plan, userData?.planExpiresAt)) {
+            return res.status(403).json({ message: 'O assistente de viagem exige um plano ativo no CashZ.' });
+        }
+
+        const rateLimitOk = await checkRateLimit(db, uid, { collection: "ai_rate_limits", max: 15, windowMs: 60_000 });
+        if (!rateLimitOk) {
+            return res.status(429).json({ message: 'Muitas mensagens. Aguarde um pouco.' });
+        }
+
+        const usageOk = await checkUsageAllowed(db);
+        if (!usageOk) {
+            return res.status(503).json({ message: 'Assistente de viagem temporariamente indisponível (limite de uso do mês atingido).' });
+        }
+
+        const { message, threadId: incomingThreadId, tripId } = req.body || {};
+        if (!message || typeof message !== 'string') {
+            return res.status(400).json({ message: 'Mensagem ausente' });
+        }
+
+        // Contexto da viagem: só injeta se o uid for participante — nunca
+        // confia no tripId sozinho pra decidir o que mostrar pra IA.
+        let tripContext: TripContext | undefined;
+        if (tripId) {
+            const tripSnap = await db.collection('trips').doc(tripId).get();
+            const tripData = tripSnap.data();
+            if (tripData && Array.isArray(tripData.participants) && tripData.participants.includes(uid)) {
+                const activitiesSnap = await db.collection('activities').where('tripId', '==', tripId).limit(200).get();
+                tripContext = {
+                    name: tripData.name,
+                    startDate: tripData.startDate,
+                    endDate: tripData.endDate,
+                    baseCurrency: tripData.baseCurrency,
+                    activities: activitiesSnap.docs.map((d) => {
+                        const a = d.data();
+                        return { dateId: a.dateId, time: a.time, location: a.location, description: a.description };
+                    }),
+                };
+            }
+        }
+
+        // Thread: continua uma existente (só se for do próprio uid) ou cria nova.
+        let threadRef: admin.firestore.DocumentReference;
+        if (incomingThreadId) {
+            threadRef = db.collection('ai_threads').doc(incomingThreadId);
+            const threadSnap = await threadRef.get();
+            if (!threadSnap.exists || threadSnap.data()?.userId !== uid) {
+                return res.status(404).json({ message: 'Conversa não encontrada' });
+            }
+        } else {
+            threadRef = db.collection('ai_threads').doc();
+            await threadRef.set({
+                userId: uid,
+                tripId: tripId ?? null,
+                title: message.slice(0, 60),
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        }
+
+        const historySnap = await db.collection('ai_messages')
+            .where('threadId', '==', threadRef.id)
+            .orderBy('createdAt', 'asc')
+            .limit(HISTORY_LIMIT)
+            .get();
+
+        const history: AIProviderMessage[] = historySnap.docs.map((d) => {
+            const m = d.data();
+            return { role: m.role, content: m.content };
+        });
+
+        await db.collection('ai_messages').add({
+            threadId: threadRef.id,
+            userId: uid,
+            role: 'user',
+            content: message,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const messages: AIProviderMessage[] = [
+            { role: 'system', content: buildSystemPrompt(tripContext) },
+            ...history,
+            { role: 'user', content: message },
+        ];
+
+        let replyText: string;
+        let suggestedActivities: SuggestedActivity[] | null = null;
+        let costUsd = 0;
+
+        try {
+            const result = await generateReply(messages);
+            const extracted = extractSuggestion(result.text);
+            replyText = extracted.reply;
+            suggestedActivities = extracted.suggestedActivities;
+            costUsd = calculateCostUsd(result.promptTokens, result.completionTokens);
+        } catch (error) {
+            console.error('❌ Erro ao gerar resposta do assistente de viagem:', error instanceof Error ? error.message : error);
+            replyText = 'Não consegui responder agora. Tente novamente em instantes.';
+        }
+
+        await db.collection('ai_messages').add({
+            threadId: threadRef.id,
+            userId: uid,
+            role: 'assistant',
+            content: replyText,
+            suggestedActivities: suggestedActivities ?? null,
+            tripId: tripId ?? null,
+            provider: 'groq',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await threadRef.update({
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastMessagePreview: replyText.slice(0, 120),
+        });
+
+        if (costUsd > 0) {
+            await recordUsage(db, costUsd);
+        }
+
+        return res.status(200).json({ threadId: threadRef.id });
+    } catch (error) {
+        console.error('❌ Erro no assistente de viagem:', error instanceof Error ? error.message : error);
+        return res.status(500).json({ message: 'Falha ao processar mensagem' });
+    }
+}

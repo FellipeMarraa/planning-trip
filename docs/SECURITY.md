@@ -48,10 +48,22 @@ Criar uma viagem (`trips` `create`) exige plano ativo no CashZ (`isCashzPremium(
 
 **Débito conhecido / trade-off aceito**: `users/{uid}` é legível por qualquer usuário logado (necessário pro `useUserProfiles`), o que significa que o status de plano (premium/free, data de expiração) de qualquer usuário é visível pra qualquer outro usuário logado no planning-trip — não é dado de pagamento (sem valor, sem cartão, sem ID de transação — isso nunca sai do CashZ), mas é mais exposição do que o CashZ dá pro próprio campo (`user_preferences` lá é leitura só do dono). Aceito pela simplicidade de reaproveitar a coleção `users` já existente em vez de criar uma coleção `billing` separada só pra restringir esse campo — revisitar se algum dia o app expuser algo mais sensível no mesmo doc.
 
-## 6. Checklist de segurança para toda mudança
+## 6. Assistente de IA — chave de API, gate de plano, escrita restrita
+
+`api/ai/chat.ts` é o primeiro backend próprio do planning-trip (ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 8) — os princípios abaixo valem pra ele como valem pros endpoints do CashZ:
+
+- **Chave de provider (`GROQ_API_KEY`) só existe em `api/ai/_lib/providers/*`**, nunca em `src/`. Mesmo motivo do split client/server já documentado pro CashZ (`AI_IMPLEMENTATION.md` de lá): uma chave de IA no bundle do client é extraível via DevTools.
+- **Gate de plano é por quem está conversando, não por quem é dono da viagem** — decisão deliberada, confirmada com o usuário: um participante convidado sem plano ativo no CashZ não usa o assistente, mesmo dentro de uma viagem cujo dono é premium (diferente de despesa/atividade manual, que continuam livres pra qualquer participante). Isso evita que uma viagem premium vire "IA de graça" pra qualquer número de convidados. `api/ai/chat.ts` replica `isCashzPremium()` server-side (nunca confia só no `plan` do cache, mesmo princípio da seção 5) antes de aceitar qualquer mensagem.
+- **`ai_threads`/`ai_messages`/`ai_usage` nunca são graváveis pelo client** (`allow write: if false` nas três, `firestore.rules`) — só o Admin SDK dentro de `api/ai/chat.ts` escreve. Evita conteúdo forjado (uma mensagem "assistant" falsa) ou manipulação do contador de custo.
+- **Contexto da viagem só é injetado no prompt se o uid for participante** — `api/ai/chat.ts` confere `participants.includes(uid)` no próprio doc da trip antes de ler atividades, nunca confia no `tripId` do corpo da requisição sozinho.
+- **A IA nunca tem tool de escrita** — ver princípio central em [ARCHITECTURE.md](./ARCHITECTURE.md) seção 8. Sugestão de roteiro é só texto/JSON na resposta; a escrita real é o usuário clicando confirmar, que chama o mesmo `createActivity` do formulário manual.
+- **Achado corrigido antes de ir pro ar**: o card de sugestão inicialmente fazia `createActivity({ tripId, ...activity })` — como `activity` vem de texto gerado pela IA (influenciável por prompt injection do próprio usuário), um `tripId` embutido nesse objeto sobrescrevia o `tripId` de confiança (da URL) na hora do spread, e a regra de `activities` (`canEdit(request.resource.data.tripId)`) valida o tripId do payload, não o da tela — permitindo redirecionar a escrita pra outra viagem onde o usuário também é editor. Corrigido nos dois lados: o client nunca mais espalha o objeto vindo da IA (copia campo a campo, `tripId` sempre o de confiança), e o servidor (`api/ai/chat.ts`, `sanitizeSuggestedActivities`) reduz qualquer sugestão só aos 4 campos esperados antes de persistir — nunca confiar no shape do JSON que o modelo devolve.
+
+## 7. Checklist de segurança para toda mudança
 
 1. Toda coleção nova tem regra explícita no mesmo commit (nunca depender do catch-all pra "proteger por omissão" — ele bloqueia tudo, incluindo a própria feature).
 2. Toda escrita restrita a um subconjunto de campos usa `diff().affectedKeys().hasOnly([...])`, não só um `allow update: if canEdit(...)` genérico, quando a intenção é limitar o que pode mudar.
 3. Nenhuma lógica de admin/permissão especial vive só no client se ela guarda uma ação que escreve dado sensível — replicar em regra.
 4. Mudança que toca o fluxo de SSO (seção 4) ou o gate de plano (seção 5) é revisada nos dois repos (CashZ e planning-trip), nunca só num lado.
 5. Nenhuma regra nova que dependa de "usuário tem plano ativo" confia só no campo `plan` — sempre recalcula `planExpiresAt` contra `request.time`, igual `isCashzPremium()`.
+6. Nenhuma tool/feature de IA nova ganha permissão de escrita sem decisão explícita — o princípio da seção 6 é permanente, não um limite técnico atual.

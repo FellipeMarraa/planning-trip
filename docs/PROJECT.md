@@ -25,6 +25,7 @@ Grupos pequenos (família, amigos) organizando uma viagem junto, tipicamente com
 | Login | Google OAuth (popup) |
 | SSO com CashZ | Usuário logado no CashZ acessa o planning-trip já autenticado via custom token — ver [SECURITY.md](./SECURITY.md) seção 4 |
 | Gate de plano pago | Criar viagem exige plano ativo no CashZ (free/expirado só visualiza o que já existe) — ver [SECURITY.md](./SECURITY.md) seção 5 |
+| Assistente de IA de viagem | Chat com um agente especializado em viagens (planejamento, clima esperado, mala, melhores datas, sugestão de roteiro) — só sugere, nunca escreve sozinho; exige plano ativo no CashZ de **quem está conversando** (não do dono da viagem) — ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 9 e [SECURITY.md](./SECURITY.md) seção 6 |
 
 ## 4. Tecnologias (reais, verificadas em `package.json`)
 
@@ -38,8 +39,9 @@ Tudo listado na tabela da seção 3. Não há push notification, não há export
 
 - **`/admin`**: rota existe (`App.tsx`, gated por `isGlobalAdmin`) mas é um placeholder estático sem funcionalidade — não expandir sem pedido explícito.
 - Multi-moeda de referência real (hoje é BRL-cêntrico por baixo do capô).
-- Qualquer backend próprio do planning-trip: hoje o único código server-side que toca este projeto é o endpoint de SSO, que mora no repo do CashZ (`CashZ/api/auth/trip-token.ts`), não aqui.
 - Notificações, exportação de dados, múltiplos idiomas.
+- Integração de API externa (clima, voos, hotéis) no assistente de IA — hoje ele responde só com o próprio conhecimento do modelo, ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 9.
+- Escrita automática da IA (criar viagem/atividade sozinha, sem confirmação do usuário) — decisão deliberada, não um limite técnico.
 
 ## 7. Restrições que moldam toda decisão técnica
 
