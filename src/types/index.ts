@@ -34,10 +34,8 @@ export interface Expense {
     amountOriginal: number;
     currency: string;
     amountBRL: number;
-    exchangeRateAtTime: number;
     paidBy: string;
     participants: string[]; // Uids (ou ghost_*) que dividem esta despesa
-    status: 'pago' | 'pendente' | 'reservar';
     date: string;
 
     spreadApplied?: number;      // O % de taxa aplicado (ex: 1.6)

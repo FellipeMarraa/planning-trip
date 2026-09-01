@@ -34,8 +34,6 @@ ESCRITA:  Componente ──▶ service (services/*.ts) ──▶ Firestore
 
 Ao adicionar um novo domínio, siga esse mesmo split: hook pra ler em tempo real, service pra escrever. Não invente uma terceira camada (repository, use-case) pra um projeto deste tamanho.
 
-**Débito conhecido**: `src/services/auth.ts` existe mas está **vazio**. Toda a lógica de auth (Google popup, logout, allowlist de admin) mora em `src/context/AuthContext.tsx`. Ou o arquivo é preenchido, ou é removido — não deixar como está sem decisão.
-
 ## 3. Hooks de cálculo puro (sem Firestore)
 
 - `useTripBalances` — recebe `expenses`/`settlements` já carregados e calcula saldo por membro num `useMemo`. Não faz I/O.

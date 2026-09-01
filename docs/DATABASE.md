@@ -46,15 +46,12 @@ interface Trip {
 interface Expense {
     id: string; tripId: string; description: string; category: string;
     amountOriginal: number; currency: string; amountBRL: number;
-    exchangeRateAtTime: number; paidBy: string; participants: string[];
-    status: 'pago' | 'pendente' | 'reservar'; date: string;
+    paidBy: string; participants: string[]; date: string;
     spreadApplied?: number; exchangeRateUsed?: number; baseRateAtTime?: number;
 }
 ```
 
 Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a taxa capturada (`exchangeRateUsed`/`baseRateAtTime`/`spreadApplied`) — mesmo que `Trip.baseCurrency` sugira outra moeda de referência, o app é BRL-cêntrico por baixo.
-
-**Débito conhecido**: `status` e `exchangeRateAtTime` existem no tipo mas o service (`services/expenses.ts`, `ExpensePayload`/`createExpense`/`updateExpense`) nunca os escreve — só grava `spreadApplied`/`exchangeRateUsed`/`baseRateAtTime`. É resquício de uma feature de status pendente/reservado que não foi (ou ainda não foi) ligada na UI. Não assumir que `status` tem valor confiável em nenhuma despesa existente.
 
 ### 2.3 `Settlement`
 
