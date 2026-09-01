@@ -44,7 +44,7 @@ Ao adicionar um novo domínio, siga esse mesmo split: hook pra ler em tempo real
 
 ## 4. Contexts globais (`src/context/`)
 
-- **`AuthContext`**: login só por Google (`signInWithPopup`, nunca `signInWithRedirect` — comentário no código explica que o redirect quebra em Safari 16.1+/Chrome 115+/Firefox 109+ porque `authDomain` (`*.firebaseapp.com`) é domínio diferente do app (`*.vercel.app`), e esses browsers bloqueiam storage entre domínios durante o redirect). `isGlobalAdmin` é um allowlist de e-mail hardcoded (`GLOBAL_ADMIN_EMAILS`), não um custom claim do Firebase.
+- **`AuthContext`**: login por Google (`signInWithPopup`, nunca `signInWithRedirect` — comentário no código explica que o redirect quebra em Safari 16.1+/Chrome 115+/Firefox 109+ porque `authDomain` (`*.firebaseapp.com`) é domínio diferente do app (`*.vercel.app`), e esses browsers bloqueiam storage entre domínios durante o redirect) **e** por e-mail/senha (`register`/`loginWithEmail`, mesmo padrão do CashZ). `register` sempre checa `fetchSignInMethodsForEmail` antes de criar conta, e trata `auth/email-already-in-use` no catch como segunda camada — sem isso, alguém registrando por e-mail/senha um endereço que já tem conta Google criaria uma segunda conta divergente (aconteceu de verdade entre CashZ e planning-trip antes desse fix, ver [SECURITY.md](./SECURITY.md) seção 3). `isGlobalAdmin` é um allowlist de e-mail hardcoded (`GLOBAL_ADMIN_EMAILS`), não um custom claim do Firebase.
 - **`ToastContext`**: toast feito à mão (sem lib externa), `showError`/`showSuccess`, auto-dismiss em 5s.
 
 ## 5. Padrão de "ghost member" — a regra de domínio mais complexa do app

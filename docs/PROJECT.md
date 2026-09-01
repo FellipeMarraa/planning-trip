@@ -22,7 +22,7 @@ Grupos pequenos (família, amigos) organizando uma viagem junto, tipicamente com
 | Itinerário | Atividades por dia (horário, local, descrição, concluído/não) — página com layout próprio (dark mode imersivo) |
 | Análise | Gráfico de gasto por categoria (Recharts), resumo de saldo por membro |
 | Cotação | Busca de câmbio ao vivo (AwesomeAPI) com fallback fixo se a API falhar |
-| Login | Google OAuth (popup) |
+| Login | Google OAuth (popup) ou e-mail/senha — mesmo leque do CashZ, ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 4 |
 | SSO com CashZ | Usuário logado no CashZ acessa o planning-trip já autenticado via custom token — ver [SECURITY.md](./SECURITY.md) seção 4 |
 | Gate de plano pago | Criar viagem exige plano ativo no CashZ (free/expirado só visualiza o que já existe) — ver [SECURITY.md](./SECURITY.md) seção 5 |
 | Assistente de IA de viagem | Chat com um agente especializado em viagens (planejamento, clima esperado, mala, melhores datas, sugestão de roteiro) — só sugere, nunca escreve sozinho; exige plano ativo no CashZ de **quem está conversando** (não do dono da viagem) — ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 9 e [SECURITY.md](./SECURITY.md) seção 6 |
