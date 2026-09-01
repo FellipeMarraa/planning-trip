@@ -15,7 +15,7 @@ Grupos pequenos (família, amigos) organizando uma viagem junto, tipicamente com
 | Área | O que existe hoje |
 |---|---|
 | Viagens | Criar/editar/apagar viagem, moeda base, datas, papéis (`OWNER`/`EDITOR`/`VIEWER`) |
-| Membros | Convite por link (token = ID do doc), troca de papel, remoção, "sair da viagem" preservando histórico |
+| Membros | Convite por link (token = ID do doc), troca de papel, transferência de dono, remoção, "sair da viagem" preservando histórico |
 | Membros sem conta | "Ghost member" — participante sem login, pode ser vinculado a um usuário real depois |
 | Despesas | Criar/editar/apagar, moeda original + conversão pra BRL, categoria, quem pagou, quem divide |
 | Acertos | Registro de pagamento de dívida entre dois participantes (sempre em BRL) |

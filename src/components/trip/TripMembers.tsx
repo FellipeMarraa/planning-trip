@@ -12,23 +12,25 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Check, ChevronLeft, ChevronRight, Eye, Link2, MoreHorizontal, Pencil, Plus, User as UserIcon, Users as UsersIcon, UserX, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Crown, Eye, Link2, MoreHorizontal, Pencil, Plus, User as UserIcon, Users as UsersIcon, UserX, X } from "lucide-react";
 import type { Trip, UserProfile, UserRole } from '@/types';
 
 interface TripMembersProps {
     trip: Trip;
     profiles: Record<string, UserProfile>;
     canEdit: boolean;
+    isOwner: boolean;
     onChangeRole: (uid: string, role: Exclude<UserRole, 'OWNER'>) => void;
     onRemoveMember: (uid: string) => void;
     onAddGhost: (name: string) => void;
     onLinkGhost: (ghostUid: string) => void;
     onRenameGhost: (ghostUid: string, name: string) => void;
+    onTransferOwnership: (uid: string) => void;
 }
 
 const MEMBERS_PER_PAGE = 4;
 
-export function TripMembers({ trip, profiles, canEdit, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost, onRenameGhost }: TripMembersProps) {
+export function TripMembers({ trip, profiles, canEdit, isOwner, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost, onRenameGhost, onTransferOwnership }: TripMembersProps) {
     const participants = trip.participants || [];
     const [ghostName, setGhostName] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -127,6 +129,11 @@ export function TripMembers({ trip, profiles, canEdit, onChangeRole, onRemoveMem
                                                 </>
                                             ) : (
                                                 <>
+                                                    {isOwner && (
+                                                        <DropdownMenuItem onClick={() => onTransferOwnership(uid)}>
+                                                            <Crown className="mr-2 h-3.5 w-3.5" /> Tornar dono
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     {memberRole !== 'EDITOR' && (
                                                         <DropdownMenuItem onClick={() => onChangeRole(uid, 'EDITOR')}>
                                                             <Pencil className="mr-2 h-3.5 w-3.5" /> Tornar editor

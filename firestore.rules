@@ -73,6 +73,19 @@ service cloud.firestore {
           request.resource.data.roles.diff(resource.data.roles).affectedKeys().hasOnly([request.auth.uid]) &&
           ghostsOf(resource.data).diff(ghostsOf(request.resource.data)).affectedKeys().size() <= 1 &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'roles', 'ghosts'])
+        ) || (
+          // Transferir dono: só o dono atual pode ceder, só pra alguém que já
+          // é participante. O dono antigo vira EDITOR (não perde acesso, só
+          // o rótulo) — participants não muda, só ownerId e o role dos dois
+          // uids envolvidos.
+          request.auth.uid == resource.data.ownerId &&
+          request.resource.data.ownerId != resource.data.ownerId &&
+          request.resource.data.ownerId in resource.data.participants &&
+          request.resource.data.roles[request.resource.data.ownerId] == 'OWNER' &&
+          request.resource.data.roles[resource.data.ownerId] == 'EDITOR' &&
+          request.resource.data.participants == resource.data.participants &&
+          request.resource.data.roles.diff(resource.data.roles).affectedKeys().hasOnly([resource.data.ownerId, request.resource.data.ownerId]) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerId', 'roles'])
         )
       );
 

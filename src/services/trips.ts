@@ -94,6 +94,17 @@ export async function changeMemberRole(tripId: string, uid: string, role: Exclud
     await updateDoc(doc(db, 'trips', tripId), { [`roles.${uid}`]: role });
 }
 
+// Só o dono atual pode chamar isso (regra do Firestore trava, mas o service
+// não confia nisso sozinho: passa currentOwnerId explícito pra não escrever
+// roles.${currentOwnerId} errado se o chamador se enganar).
+export async function transferOwnership(tripId: string, currentOwnerId: string, newOwnerId: string) {
+    await updateDoc(doc(db, 'trips', tripId), {
+        ownerId: newOwnerId,
+        [`roles.${newOwnerId}`]: 'OWNER',
+        [`roles.${currentOwnerId}`]: 'EDITOR',
+    });
+}
+
 export async function removeMember(tripId: string, uid: string) {
     await updateDoc(doc(db, 'trips', tripId), {
         participants: arrayRemove(uid),

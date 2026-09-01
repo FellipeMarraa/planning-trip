@@ -9,9 +9,9 @@ import { useTripRole } from '@/hooks/useTripRole';
 import { useSettlements } from '@/hooks/useSettlements';
 import { useTripBalances } from '@/hooks/useTripBalances';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
-import { isGhostUid } from '@/lib/members';
+import { getMemberName, isGhostUid } from '@/lib/members';
 import { cn } from '@/lib/utils';
-import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember } from '@/services/trips';
+import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember, transferOwnership } from '@/services/trips';
 import { createInvite } from '@/services/invites';
 import { deleteExpense } from '@/services/expenses';
 import { createSettlement, deleteSettlement } from '@/services/settlements';
@@ -83,6 +83,7 @@ export default function TripDetails() {
 
     const [ghostToLink, setGhostToLink] = useState<string | null>(null);
     const [memberToInspect, setMemberToInspect] = useState<string | null>(null);
+    const [memberToOwnerize, setMemberToOwnerize] = useState<string | null>(null);
 
     const { user } = useAuth();
     const { showError, showSuccess } = useToast();
@@ -244,6 +245,19 @@ export default function TripDetails() {
         }
     };
 
+    const handleTransferOwnership = async () => {
+        if (!tripId || !user || !memberToOwnerize) return;
+        try {
+            await transferOwnership(tripId, user.uid, memberToOwnerize);
+            showSuccess("Novo dono definido.");
+        } catch (err) {
+            console.error("Erro ao transferir dono da viagem:", err);
+            showError("Não foi possível transferir a posse da viagem.");
+        } finally {
+            setMemberToOwnerize(null);
+        }
+    };
+
     const handleRemoveMember = async (uid: string) => {
         if (!tripId) return;
         try {
@@ -384,11 +398,13 @@ export default function TripDetails() {
                     trip={trip}
                     profiles={profiles}
                     canEdit={canEdit}
+                    isOwner={isOwner}
                     onChangeRole={handleChangeRole}
                     onRemoveMember={handleRemoveMember}
                     onAddGhost={handleAddGhost}
                     onLinkGhost={setGhostToLink}
                     onRenameGhost={handleRenameGhost}
+                    onTransferOwnership={setMemberToOwnerize}
                 />
             )}
 
@@ -518,6 +534,23 @@ export default function TripDetails() {
                     canEdit={canEdit}
                 />
             )}
+
+            <AlertDialog open={!!memberToOwnerize} onOpenChange={() => setMemberToOwnerize(null)}>
+                <AlertDialogContent className="rounded-3xl max-w-[360px] p-8">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground text-center">Transferir a posse da viagem?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-center">
+                            {trip && memberToOwnerize && (
+                                <>{getMemberName(memberToOwnerize, trip, profiles)} vira o novo dono. Você continua com acesso total, como editor.</>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="flex-1 rounded-xl h-10">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleTransferOwnership} className="flex-1 rounded-xl h-10">Transferir</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             <AlertDialog open={!!expenseToDelete} onOpenChange={() => setExpenseToDelete(null)}>
                 <AlertDialogContent className="rounded-3xl max-w-[360px] p-8">
