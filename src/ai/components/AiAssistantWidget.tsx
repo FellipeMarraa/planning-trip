@@ -15,6 +15,8 @@ import { AiAssistantProvider, useAiAssistant } from '../contexts/AiAssistantCont
 import { useAIChat } from '../hooks/useAIChat';
 import { useAIThreads } from '../hooks/useAIThreads';
 import { SuggestedItineraryCard } from './SuggestedItineraryCard';
+import { SuggestedTripCard } from './SuggestedTripCard';
+import { ChatMarkdown } from './ChatMarkdown';
 import { ChevronLeft, Loader2, MessageSquarePlus, Plane, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -119,13 +121,16 @@ function ChatPanel({ tripId }: { tripId?: string }) {
                 {messages.map((m) => (
                     <div key={m.id} className={cn("space-y-2", m.role === 'user' ? 'text-right' : 'text-left')}>
                         <div className={cn(
-                            "inline-block rounded-2xl px-4 py-2 text-sm max-w-[85%] whitespace-pre-wrap text-left",
-                            m.role === 'user' ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                            "inline-block rounded-2xl px-4 py-2 max-w-[90%] text-left",
+                            m.role === 'user' ? "bg-primary text-primary-foreground text-sm whitespace-pre-wrap" : "bg-muted text-foreground"
                         )}>
-                            {m.content}
+                            {m.role === 'assistant' ? <ChatMarkdown content={m.content} /> : m.content}
                         </div>
                         {m.role === 'assistant' && tripId && m.suggestedActivities && m.suggestedActivities.length > 0 && (
                             <SuggestedItineraryCard tripId={tripId} activities={m.suggestedActivities} />
+                        )}
+                        {m.role === 'assistant' && m.suggestedTrip && (
+                            <SuggestedTripCard trip={m.suggestedTrip} />
                         )}
                     </div>
                 ))}

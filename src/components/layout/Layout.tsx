@@ -1,10 +1,13 @@
 // src/components/layout/Layout.tsx
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from "@/components/ui/button";
 import { Plane, LogOut, User as UserIcon, Settings } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
-import { AiAssistantWidget } from '@/ai/components/AiAssistantWidget';
+
+// Lazy: react-markdown/remark-gfm (usados só dentro do chat) não devem
+// carregar em toda página só porque o botão flutuante aparece nelas.
+const AiAssistantWidget = lazy(() => import('@/ai/components/AiAssistantWidget').then((m) => ({ default: m.AiAssistantWidget })));
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const { user, logout, isGlobalAdmin } = useAuth();
@@ -75,7 +78,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {children}
             </main>
 
-            <AiAssistantWidget />
+            <Suspense fallback={null}>
+                <AiAssistantWidget />
+            </Suspense>
         </div>
     );
 }
