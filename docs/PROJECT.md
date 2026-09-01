@@ -24,6 +24,7 @@ Grupos pequenos (família, amigos) organizando uma viagem junto, tipicamente com
 | Cotação | Busca de câmbio ao vivo (AwesomeAPI) com fallback fixo se a API falhar |
 | Login | Google OAuth (popup) |
 | SSO com CashZ | Usuário logado no CashZ acessa o planning-trip já autenticado via custom token — ver [SECURITY.md](./SECURITY.md) seção 4 |
+| Gate de plano pago | Criar viagem exige plano ativo no CashZ (free/expirado só visualiza o que já existe) — ver [SECURITY.md](./SECURITY.md) seção 5 |
 
 ## 4. Tecnologias (reais, verificadas em `package.json`)
 

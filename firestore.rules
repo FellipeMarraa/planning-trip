@@ -26,10 +26,23 @@ service cloud.firestore {
       return 'ghosts' in data ? data.ghosts : {};
     }
 
+    // Espelha o isPlanActive() do CashZ: nunca confia só no campo `plan`
+    // sincronizado, sempre recalcula a expiração contra o horário da própria
+    // escrita. `plan`/`planExpiresAt` em users/{uid} só são escritos pelo
+    // Admin SDK do CashZ (ver regra de users abaixo) — nunca pelo client.
+    function isCashzPremium(uid) {
+      let path = /databases/$(database)/documents/users/$(uid);
+      return exists(path)
+        && get(path).data.plan in ['premium', 'annual']
+        && (!('planExpiresAt' in get(path).data) || get(path).data.planExpiresAt == null
+            || timestamp.value(get(path).data.planExpiresAt) > request.time);
+    }
+
     match /trips/{tripId} {
       allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
 
       allow create: if isSignedIn()
+        && isCashzPremium(request.auth.uid)
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.participants == [request.auth.uid]
         && request.resource.data.roles[request.auth.uid] == 'OWNER';
@@ -93,7 +106,16 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && request.auth.uid == uid;
+
+      // `plan`/`planExpiresAt`/`planSyncedAt` (status de plano sincronizado
+      // do CashZ) nunca podem ser escritos pelo client — só o Admin SDK do
+      // CashZ escreve esses campos (bypassa regra). O client só mexe no
+      // próprio perfil.
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL']);
+
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'email', 'displayName', 'photoURL']);
     }
 
     match /settlements/{settlementId} {

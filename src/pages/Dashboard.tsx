@@ -1,8 +1,19 @@
 // src/pages/Dashboard.tsx
 import { useState } from "react";
 import { useUserTrips } from '../hooks/useUserTrips';
+import { useCashzPlan } from '../hooks/useCashzPlan';
 import { useAuth } from '../context/AuthContext';
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { ArrowRight, Calendar, Clock, Plane, Plus } from "lucide-react";
@@ -13,9 +24,19 @@ import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isUpgradePromptOpen, setIsUpgradePromptOpen] = useState(false);
     const { trips, loading } = useUserTrips();
+    const { isPremium } = useCashzPlan();
     const { user } = useAuth();
     const navigate = useNavigate();
+
+    const handleNewTripClick = () => {
+        if (isPremium) {
+            setIsCreateOpen(true);
+        } else {
+            setIsUpgradePromptOpen(true);
+        }
+    };
 
     if (loading) {
         return (
@@ -36,7 +57,7 @@ export default function Dashboard() {
                 </div>
 
                 <Button
-                    onClick={() => setIsCreateOpen(true)}
+                    onClick={handleNewTripClick}
                     className="h-11 px-6 rounded-xl font-medium shadow-sm"
                 >
                     <Plus className="mr-2 h-4 w-4" />
@@ -104,6 +125,23 @@ export default function Dashboard() {
             </div>
 
             <CreateTripDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+
+            <AlertDialog open={isUpgradePromptOpen} onOpenChange={setIsUpgradePromptOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Plano CashZ necessário</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Criar uma viagem exige um plano ativo no CashZ. Assine no CashZ e volte pra criar sua viagem.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Fechar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => window.open('https://cashz.vercel.app', '_blank', 'noopener,noreferrer')}>
+                            Assinar no CashZ
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

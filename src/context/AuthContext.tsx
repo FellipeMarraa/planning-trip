@@ -4,6 +4,7 @@ import {GoogleAuthProvider, signInWithPopup, signOut, type User} from 'firebase/
 import {upsertUserProfile} from '../services/users';
 import {useToast} from './ToastContext';
 import PageLoader from '../components/common/page-loader';
+import {syncPlanFromCashz} from '../lib/planSync';
 
 interface AuthContextType {
     user: User | null;
@@ -51,6 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
             if (user) {
                 upsertUserProfile(user).catch((error) => console.error("Erro ao salvar perfil:", error));
+                // Sincroniza plano em paralelo, sem bloquear o carregamento —
+                // cobre quem loga direto (sem passar pelo SSO do CashZ).
+                syncPlanFromCashz(user);
             }
         });
         return unsubscribe;

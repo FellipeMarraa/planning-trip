@@ -77,6 +77,8 @@ interface UserProfile { uid: string; email: string; displayName: string; photoUR
 
 Cache leve do perfil, separado do Firebase Auth, pra outros participantes conseguirem ler nome/foto de um membro sem precisar de Admin SDK. Upsertado a cada login (`setDoc(..., {merge:true})`), nunca deletado automaticamente.
 
+**Campos extras gravados mas fora dessa interface TS** (mesmo padrão de drift descrito em 2.2): o doc também carrega `plan?: 'free'|'premium'|'annual'`, `planExpiresAt?: string|null` e `planSyncedAt?: Timestamp` — status de plano sincronizado do CashZ (ver [SECURITY.md](./SECURITY.md) seção 5), escritos só pelo Admin SDK do CashZ, nunca pelo client (`services/users.ts` não os conhece). Um doc de usuário que nunca fez SSO nem teve o próprio `plan-status` sincronizado simplesmente não tem esses campos — trate ausência como "desconhecido/free", nunca como erro.
+
 ### 2.6 `invites`
 
 ```ts
