@@ -1,5 +1,5 @@
 // src/pages/TripDetails.tsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -97,7 +97,11 @@ export default function TripDetails() {
     const balances = useTripBalances(trip?.participants || [], expenses, settlements);
     // Busca única dos perfis, compartilhada com todos os componentes da página
     // (evita 6+ listeners independentes pros mesmos usuários).
-    const profiles = useUserProfiles((trip?.participants || []).filter((uid) => !isGhostUid(uid)));
+    const { profiles, error: profilesError } = useUserProfiles((trip?.participants || []).filter((uid) => !isGhostUid(uid)));
+    useEffect(() => {
+        if (profilesError) showError(profilesError);
+    }, [profilesError, showError]);
+
     const expenseToView = useMemo(
         () => expenses.find((expense) => expense.id === expenseToViewId) || null,
         [expenses, expenseToViewId]

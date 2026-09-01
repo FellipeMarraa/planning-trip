@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTrip } from '@/hooks/useTrip';
 import { useActivities } from '@/hooks/useActivities';
 import { useTripRole } from '@/hooks/useTripRole';
+import { useToast } from '@/context/ToastContext';
 import { addDays, differenceInDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -26,8 +27,13 @@ export default function TripItineraryPage() {
     const navigate = useNavigate();
 
     const { trip, loading: tripLoading } = useTrip(tripId || '');
-    const { activities } = useActivities(tripId || '');
+    const { activities, error: activitiesError } = useActivities(tripId || '');
     const { canEdit } = useTripRole(trip);
+    const { showError } = useToast();
+
+    useEffect(() => {
+        if (activitiesError) showError(activitiesError);
+    }, [activitiesError, showError]);
 
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);

@@ -17,7 +17,7 @@ try {
 
 ## 2. Frontend — erro de listener (`onSnapshot`)
 
-**Débito conhecido**: inconsistente entre hooks. `useTrip.ts` passa um callback de erro ao `onSnapshot` que faz `console.error` **e** seta um estado local de erro surfaced na UI (mensagem tipo "Acesso negado à viagem."). `useActivities.ts` e a assinatura por-perfil em `useUserProfiles.ts` só fazem `console.error`, sem estado de erro visível — se a leitura falhar (ex.: regra negou acesso), a UI fica silenciosamente sem dado, sem avisar o usuário. Ao criar um hook de leitura novo, seguir o padrão de `useTrip.ts` (surfaced error), não o silencioso.
+Padronizado: todo hook de leitura por `onSnapshot` passa um callback de erro que faz `console.error` **e** retorna um `error: string | null` surfaced. `useTrip.ts` usa esse erro pra substituir a página inteira (erro bloqueante — sem a viagem, nada mais faz sentido). `useActivities.ts` e `useUserProfiles.ts` retornam o erro sem bloquear a página (a viagem/roteiro continuam usáveis mesmo se um dado secundário falhar); quem consome (`TripItineraryPage.tsx`, `TripDetails.tsx`) observa esse valor num `useEffect` e mostra `ToastContext.showError`, em vez de bloquear a tela. Ao criar um hook de leitura novo, seguir esse padrão — nunca `onSnapshot` sem callback de erro.
 
 ## 3. Error boundary de React
 
