@@ -5,9 +5,10 @@ import admin from "firebase-admin";
 // pra isso). Só um teto global mensal hardcoded.
 const GLOBAL_LIMIT_USD = 5;
 
-// Preço aproximado (USD por 1k tokens) do modelo Groq usado — revisar se o
+// Preço aproximado (USD por 1k tokens) do modelo Groq usado
+// (openai/gpt-oss-20b: $0.075/1M entrada, $0.30/1M saída) — revisar se o
 // preço publicado mudar.
-const PRICING = { promptPer1k: 0.00005, completionPer1k: 0.00008 };
+const PRICING = { promptPer1k: 0.000075, completionPer1k: 0.0003 };
 
 function isSamePeriod(periodStart: string | undefined): boolean {
     if (!periodStart) return false;

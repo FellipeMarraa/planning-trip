@@ -1,7 +1,9 @@
 import type { AIProvider, AIProviderMessage, AIProviderResult } from "./types.js";
 import { ProviderNotConfiguredError } from "./types.js";
 
-const MODEL = "llama-3.1-8b-instant";
+// llama-3.1-8b-instant foi descontinuado pela Groq (jun/2026) — substituto
+// recomendado oficialmente pela própria Groq pra esse caso de uso.
+const MODEL = "openai/gpt-oss-20b";
 
 export const groqProvider: AIProvider = {
     name: "groq",
