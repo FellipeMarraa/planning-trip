@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, User as UserIcon } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { UserAvatar } from '@/components/common/user-avatar';
 
 const PLAN_LABEL: Record<string, string> = {
     premium: 'Premium',
@@ -54,15 +55,7 @@ export default function Profile() {
                 </CardHeader>
                 <CardContent className="space-y-5">
                     <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-full border border-border bg-muted overflow-hidden shrink-0">
-                            {user?.photoURL ? (
-                                <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <UserIcon className="w-6 h-6 text-muted-foreground" />
-                                </div>
-                            )}
-                        </div>
+                        <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="size-16 text-lg" />
                         <p className="text-xs text-muted-foreground">
                             Foto vem da sua conta Google — pra trocar, atualize por lá.
                         </p>

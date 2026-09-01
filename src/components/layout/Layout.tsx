@@ -2,8 +2,9 @@
 import React, { lazy, Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from "@/components/ui/button";
-import { Plane, LogOut, User as UserIcon, Settings } from "lucide-react";
+import { Plane, LogOut, Settings } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
+import { UserAvatar } from '@/components/common/user-avatar';
 
 // Lazy: react-markdown/remark-gfm (usados só dentro do chat) não devem
 // carregar em toda página só porque o botão flutuante aparece nelas.
@@ -50,15 +51,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                                 </div>
 
-                                <div className="w-9 h-9 rounded-full border border-border bg-muted overflow-hidden">
-                                    {user?.photoURL ? (
-                                        <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <UserIcon className="w-4 h-4 text-muted-foreground" />
-                                        </div>
-                                    )}
-                                </div>
+                                <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="size-9" />
                             </Link>
 
                             <Button

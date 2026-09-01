@@ -12,7 +12,8 @@ import {
     DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Check, ChevronLeft, ChevronRight, Crown, Eye, Link2, MoreHorizontal, Pencil, Plus, User as UserIcon, Users as UsersIcon, UserX, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Crown, Eye, Link2, MoreHorizontal, Pencil, Plus, Users as UsersIcon, UserX, X } from "lucide-react";
+import { UserAvatar } from "@/components/common/user-avatar";
 import type { Trip, UserProfile, UserRole } from '@/types';
 
 interface TripMembersProps {
@@ -92,15 +93,7 @@ export function TripMembers({ trip, profiles, canEdit, isOwner, onChangeRole, on
                                 </form>
                             ) : (
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-7 h-7 rounded-full border border-border bg-muted overflow-hidden flex-shrink-0">
-                                        {photoURL ? (
-                                            <img src={photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
-                                            </div>
-                                        )}
-                                    </div>
+                                    <UserAvatar photoURL={photoURL} name={name} className="size-7 text-xs flex-shrink-0" />
                                     <span className="text-sm text-foreground truncate">{name}</span>
                                 </div>
                             )}
