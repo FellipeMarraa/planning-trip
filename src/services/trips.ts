@@ -38,8 +38,8 @@ interface CreateTripInput {
     baseCurrency: string;
 }
 
-export async function createTrip(input: CreateTripInput) {
-    await addDoc(collection(db, 'trips'), {
+export async function createTrip(input: CreateTripInput): Promise<string> {
+    const docRef = await addDoc(collection(db, 'trips'), {
         name: input.name,
         startDate: input.startDate,
         endDate: input.endDate,
@@ -50,6 +50,7 @@ export async function createTrip(input: CreateTripInput) {
         exchangeRates: { EUR: 6.12, GBP: 7.34, USD: 5.45 },
         createdAt: serverTimestamp(),
     });
+    return docRef.id;
 }
 
 interface UpdateTripInput {

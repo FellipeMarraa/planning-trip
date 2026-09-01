@@ -5,6 +5,13 @@ export interface SuggestedActivity {
     description: string;
 }
 
+export interface SuggestedTrip {
+    name: string;
+    startDate: string;
+    endDate: string;
+    baseCurrency: string;
+}
+
 export interface AiMessage {
     id: string;
     threadId: string;
@@ -12,6 +19,7 @@ export interface AiMessage {
     role: 'user' | 'assistant';
     content: string;
     suggestedActivities?: SuggestedActivity[] | null;
+    suggestedTrip?: SuggestedTrip | null;
 }
 
 export interface AiThread {

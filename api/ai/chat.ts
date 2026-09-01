@@ -2,7 +2,15 @@ import admin from "firebase-admin";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { checkRateLimit } from "./_lib/rateLimit.js";
 import { checkUsageAllowed, calculateCostUsd, recordUsage } from "./_lib/usage.js";
-import { buildSystemPrompt, SUGGESTION_START, SUGGESTION_END, type TripContext } from "./_lib/prompt.js";
+import {
+    buildSystemPrompt,
+    SUGGESTION_START,
+    SUGGESTION_END,
+    TRIP_SUGGESTION_START,
+    TRIP_SUGGESTION_END,
+    CURRENCY_CODES,
+    type TripContext,
+} from "./_lib/prompt.js";
 import { generateReply } from "./_lib/providers/registry.js";
 import type { AIProviderMessage } from "./_lib/providers/types.js";
 
@@ -75,6 +83,53 @@ function extractSuggestion(text: string): { reply: string; suggestedActivities: 
         return { reply, suggestedActivities: sanitizeSuggestedActivities(parsed) };
     } catch {
         return { reply, suggestedActivities: null };
+    }
+}
+
+interface SuggestedTrip {
+    name: string;
+    startDate: string;
+    endDate: string;
+    baseCurrency: string;
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Mesma defesa em profundidade de sanitizeSuggestedActivities: nunca confiar
+// no shape do JSON que a IA emite. Datas mal formadas, fora de ordem, ou
+// moeda fora da lista suportada pelo app derrubam a sugestão inteira (volta
+// null) em vez de deixar passar algo que o CreateTripDialog nunca aceitaria.
+function sanitizeSuggestedTrip(parsed: unknown): SuggestedTrip | null {
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const obj = parsed as Record<string, unknown>;
+
+    const name = typeof obj.name === 'string' ? obj.name.trim().slice(0, 100) : '';
+    const startDate = typeof obj.startDate === 'string' ? obj.startDate : '';
+    const endDate = typeof obj.endDate === 'string' ? obj.endDate : '';
+    const baseCurrency = typeof obj.baseCurrency === 'string' ? obj.baseCurrency.toUpperCase() : '';
+
+    if (!name) return null;
+    if (!DATE_RE.test(startDate) || !DATE_RE.test(endDate) || startDate > endDate) return null;
+    if (!CURRENCY_CODES.includes(baseCurrency)) return null;
+
+    return { name, startDate, endDate, baseCurrency };
+}
+
+function extractTripSuggestion(text: string): { reply: string; suggestedTrip: SuggestedTrip | null } {
+    const start = text.indexOf(TRIP_SUGGESTION_START);
+    const end = text.indexOf(TRIP_SUGGESTION_END);
+    if (start === -1 || end === -1 || end < start) {
+        return { reply: text, suggestedTrip: null };
+    }
+
+    const jsonBlock = text.slice(start + TRIP_SUGGESTION_START.length, end).trim();
+    const reply = (text.slice(0, start) + text.slice(end + TRIP_SUGGESTION_END.length)).trim();
+
+    try {
+        const parsed = JSON.parse(jsonBlock);
+        return { reply, suggestedTrip: sanitizeSuggestedTrip(parsed) };
+    } catch {
+        return { reply, suggestedTrip: null };
     }
 }
 
@@ -181,13 +236,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         let replyText: string;
         let suggestedActivities: SuggestedActivity[] | null = null;
+        let suggestedTrip: SuggestedTrip | null = null;
         let costUsd = 0;
 
         try {
             const result = await generateReply(messages);
-            const extracted = extractSuggestion(result.text);
-            replyText = extracted.reply;
-            suggestedActivities = extracted.suggestedActivities;
+            const extractedActivities = extractSuggestion(result.text);
+            const extractedTrip = extractTripSuggestion(extractedActivities.reply);
+            replyText = extractedTrip.reply;
+            suggestedActivities = extractedActivities.suggestedActivities;
+            suggestedTrip = extractedTrip.suggestedTrip;
             costUsd = calculateCostUsd(result.promptTokens, result.completionTokens);
         } catch (error) {
             console.error('❌ Erro ao gerar resposta do assistente de viagem:', error instanceof Error ? error.message : error);
@@ -200,6 +258,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             role: 'assistant',
             content: replyText,
             suggestedActivities: suggestedActivities ?? null,
+            suggestedTrip: suggestedTrip ?? null,
             tripId: tripId ?? null,
             provider: 'groq',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
