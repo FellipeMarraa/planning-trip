@@ -10,7 +10,7 @@
 
 ## 2. Médio prazo (próximos meses)
 
-1. Primeiro teste automatizado (ver [TESTS.md](./TESTS.md) seção 3, prioridade 1: `firestore.rules`).
+1. ~~Primeiro teste automatizado (prioridade 1: `firestore.rules`)~~ — **feito**: `firestore-tests/rules.test.ts` + `npm run test:rules`, ver [TESTS.md](./TESTS.md) seção 4. Só falta rodar de fato — máquina de dev está com Java 8, emulador exige 21+.
 2. ~~Error boundary de React~~ — **feito**: `src/components/common/error-boundary.tsx`, envolve `<Suspense>`/`<Routes>` em `App.tsx`. Trata em especial falha de chunk lazy-loaded pós-deploy (recarrega a página automaticamente uma vez) — era a causa real da tela branca ao abrir `/profile` reportada pelo usuário.
 3. ~~Padronizar tratamento de erro de `onSnapshot` entre hooks~~ — **feito**: `useActivities.ts` e `useUserProfiles.ts` agora retornam `error` surfaced (via toast nas páginas que os usam), mesmo padrão de `useTrip.ts` (ver [ERROR_HANDLING.md](./ERROR_HANDLING.md) seção 2).
 

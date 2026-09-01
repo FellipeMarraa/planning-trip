@@ -1,14 +1,14 @@
-# TESTS.md — Zero testes hoje, prioridade de adoção
+# TESTS.md — Estado real da suíte de testes
 
-> Vitest não está instalado, não há `test` script no `package.json`, não há um único arquivo `*.test.*` no repositório. Isso é o estado real — as prioridades abaixo são recomendação, não algo já em curso.
+> Prioridade 1 (`firestore.rules`) está implementada — ver seção 4. Prioridades 2-4 continuam recomendação, não implementadas ainda.
 
 ## 1. Por que isso importa mais do que pareceria num projeto pequeno
 
 A lógica mais arriscada do app (migração de "ghost member", cálculo de saldo entre participantes) mexe com dinheiro dividido entre pessoas reais — um bug silencioso ali gera dívida calculada errada, não só um glitch visual. Isso pesa mais que o tamanho do projeto sugeriria.
 
-## 2. Framework (recomendado, não instalado)
+## 2. Framework
 
-Seguir a mesma escolha do CashZ por consistência entre os dois repos: **Vitest**, sem Cypress/Playwright. Adicionar como dependência de desenvolvimento só quando o primeiro teste for escrito, não antes (não instalar infraestrutura sem teste nenhum pra rodar nela).
+Mesma escolha do CashZ por consistência entre os dois repos: **Vitest**, sem Cypress/Playwright. Instalado (`vitest`, `@firebase/rules-unit-testing`, `firebase-tools`) junto do primeiro teste (regras, seção 4) — não antes.
 
 ## 3. Prioridade de cobertura (por risco de negócio, não por facilidade de escrever)
 
@@ -21,12 +21,16 @@ Seguir a mesma escolha do CashZ por consistência entre os dois repos: **Vitest*
 
 ## 4. Testes de `firestore.rules`
 
-Recomendação: mesmo padrão do CashZ — `vitest.rules.config.ts` separado, rodado via `firebase emulators:exec --only firestore --project planning-trip-6a9cb "vitest run --config vitest.rules.config.ts"`, exercitando os 3 branches de `update` em `trips` (edição normal, auto-join, sair-como-ghost) e as regras de `expenses`/`settlements`/`invites`. Exige Java 21+ local pro emulator, como no CashZ.
+Implementado: `firestore-tests/rules.test.ts` (mesmo padrão do CashZ — `initializeTestEnvironment` + `assertSucceeds`/`assertFails`, seed via `withSecurityRulesDisabled`), config em `vitest.rules.config.ts`, rodado via `npm run test:rules` (`firebase emulators:exec --only firestore --project planning-trip-6a9cb "vitest run --config vitest.rules.config.ts"`).
 
-## 5. Verificação manual (enquanto não há suíte automatizada)
+Cobre, com pelo menos 1 caso permite + 1 nega cada: os 4 branches de `update` em `trips` (edição normal, auto-join via convite, sair como fantasma, **transferir dono** — o mais recente e o de maior risco por ser um branch novo), `create`/`read`/`delete` de `trips`, `expenses`, `settlements` (o `to == request.auth.uid` do create), `users/{uid}` (a whitelist de campos — inclui um teste específico pro trust boundary do plano CashZ: client não escreve `plan` direto), `ai_threads`/`ai_messages`/`ai_usage` (só o backend escreve) e `invites`.
 
-Até a prioridade 1 existir, qualquer mudança em `firestore.rules` deve ser testada manualmente no Firebase Emulator Suite antes de deploy — nunca só confiar em teste manual pela UI de produção pra regra de segurança.
+**Exige Java 21+ local** pro Firebase Emulator (mesmo requisito do CashZ) — sem isso, `npm run test:rules` falha com `firebase-tools no longer supports Java version before 21`. O arquivo de teste em si foi validado sem emulador (`npx vitest run --config vitest.rules.config.ts` reconhece as 32 asserções, sem erro de sintaxe/import/tipo) — só não roda de fato sem o JDK certo.
+
+## 5. Verificação manual (enquanto o ambiente não tem Java 21+)
+
+Até alguém rodar `npm run test:rules` com sucesso pelo menos uma vez, qualquer mudança em `firestore.rules` continua exigindo teste manual no Firebase Emulator Suite (ou revisão cuidadosa) antes de deploy — não assumir que a suíte escrita já é uma rede de segurança rodando de verdade.
 
 ## 6. Meta de adoção (realista, não aspiracional)
 
-Não existe meta de cobertura percentual. A meta é: nenhuma mudança nova em `firestore.rules` ou nas funções de migração de ghost entra sem teste cobrindo o caso que motivou a mudança — cobertura cresce por necessidade, não por campanha.
+Não existe meta de cobertura percentual. A meta é: nenhuma mudança nova em `firestore.rules` ou nas funções de migração de ghost entra sem teste cobrindo o caso que motivou a mudança — cobertura cresce por necessidade, não por campanha. Próximo passo real (prioridade 2): `useTripBalances`, que não depende do emulador — pode ser feito mesmo sem o JDK.

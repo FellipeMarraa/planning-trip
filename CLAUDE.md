@@ -33,7 +33,7 @@ Os documentos em `docs/` se referenciam entre si porque a arquitetura real é in
 | [docs/PERFORMANCE.md](./docs/PERFORMANCE.md) | Lazy loading (feito), memoização, limites de query, o que falta |
 | [docs/ERROR_HANDLING.md](./docs/ERROR_HANDLING.md) | Padrão de erro no frontend (try/catch + toast), inconsistência conhecida |
 | [docs/LOGGING.md](./docs/LOGGING.md) | Estado real (só console), débitos conhecidos |
-| [docs/TESTS.md](./docs/TESTS.md) | Estado real (zero testes) e prioridade de adoção |
+| [docs/TESTS.md](./docs/TESTS.md) | `firestore.rules` testado (emulador); prioridade de adoção do resto |
 | [docs/DEPLOY.md](./docs/DEPLOY.md) | Vercel + Firebase, passos manuais, dependência do CashZ |
 | [docs/ROADMAP.md](./docs/ROADMAP.md) | Curto/médio/longo prazo, por prioridade de risco |
 | [docs/GIT.md](./docs/GIT.md) | Branches, commits, PR, checklist de revisão |
