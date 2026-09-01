@@ -8,6 +8,7 @@ import Layout from './components/layout/Layout';
 // Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
 const Login = lazy(() => import('./pages/Login'));
+const Sso = lazy(() => import('@/pages/Sso.tsx'));
 const Dashboard = lazy(() => import('@/pages/Dashboard.tsx'));
 const TripDetails = lazy(() => import('@/pages/TripDetails.tsx'));
 const JoinTrip = lazy(() => import('@/pages/JoinTrip.tsx'));
@@ -77,6 +78,9 @@ export default function App() {
                             <Login />
                         </PublicRoute>
                     } />
+
+                    {/* Rota transitória de SSO vindo do CashZ: consome o custom token e redireciona */}
+                    <Route path="/sso" element={<Sso />} />
 
                     {/* Rota Principal: Dashboard */}
                     <Route path="/" element={
