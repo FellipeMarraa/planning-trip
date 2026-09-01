@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { getMemberName } from "@/lib/members";
-import { Users } from "lucide-react";
+import { UserX, Users } from "lucide-react";
 import type { Expense, Trip, UserProfile } from '@/types';
 
 interface ExpenseParticipantsModalProps {
@@ -11,16 +11,21 @@ interface ExpenseParticipantsModalProps {
     trip: Trip;
     profiles: Record<string, UserProfile>;
     expense: Expense | null;
+    canEdit: boolean;
+    onRemoveParticipant: (uid: string) => void;
 }
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, expense }: ExpenseParticipantsModalProps) {
+export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, expense, canEdit, onRemoveParticipant }: ExpenseParticipantsModalProps) {
     if (!expense) return null;
 
     const participants = expense.participants || [];
     const share = expense.amountBRL / (participants.length || 1);
+    // Quem pagou não pode ser removido por aqui — mudar o pagador é uma
+    // decisão diferente, feita editando a despesa inteira.
+    const canRemove = (uid: string) => canEdit && participants.length > 1 && uid !== expense.paidBy;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -51,9 +56,21 @@ export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, e
                                         <Badge variant="default" className="font-medium">Pagou</Badge>
                                     )}
                                 </div>
-                                <span className="text-sm font-semibold text-foreground tabular-nums flex-shrink-0">
-                                    {formatBRL(share)}
-                                </span>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                                        {formatBRL(share)}
+                                    </span>
+                                    {canRemove(uid) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onRemoveParticipant(uid)}
+                                            className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                            aria-label={`Remover ${getMemberName(uid, trip, profiles)} desta despesa`}
+                                        >
+                                            <UserX className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         ))
                     )}

@@ -13,7 +13,7 @@ import { getMemberName, isGhostUid } from '@/lib/members';
 import { cn } from '@/lib/utils';
 import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember, transferOwnership } from '@/services/trips';
 import { createInvite } from '@/services/invites';
-import { deleteExpense } from '@/services/expenses';
+import { deleteExpense, removeExpenseParticipant } from '@/services/expenses';
 import { createSettlement, deleteSettlement } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/common/stat-card";
@@ -68,7 +68,10 @@ export default function TripDetails() {
     const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
     const [expenseToEdit, setExpenseToEdit] = useState<Expense | undefined>(undefined);
     const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
-    const [expenseToView, setExpenseToView] = useState<Expense | null>(null);
+    // Guarda só o id (não o objeto Expense inteiro) pra sempre exibir a versão
+    // ao vivo de `expenses` — sem isso, remover um participante dentro do modal
+    // não refletiria na hora, o modal ficaria mostrando o snapshot de quando foi aberto.
+    const [expenseToViewId, setExpenseToViewId] = useState<string | null>(null);
     const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
     const [isLeaveTripOpen, setIsLeaveTripOpen] = useState(false);
     const [isEditTripOpen, setIsEditTripOpen] = useState(false);
@@ -95,6 +98,10 @@ export default function TripDetails() {
     // Busca única dos perfis, compartilhada com todos os componentes da página
     // (evita 6+ listeners independentes pros mesmos usuários).
     const profiles = useUserProfiles((trip?.participants || []).filter((uid) => !isGhostUid(uid)));
+    const expenseToView = useMemo(
+        () => expenses.find((expense) => expense.id === expenseToViewId) || null,
+        [expenses, expenseToViewId]
+    );
 
     // Visualizador só vê despesas em que participou; owner/editor vê tudo.
     const visibleExpenses = useMemo(() => {
@@ -176,6 +183,16 @@ export default function TripDetails() {
         } catch (err) {
             console.error("Erro ao excluir despesa:", err);
             showError("Não foi possível excluir a despesa. Tente novamente.");
+        }
+    };
+
+    const handleRemoveExpenseParticipant = async (expenseId: string, uid: string) => {
+        try {
+            await removeExpenseParticipant(expenseId, uid);
+            showSuccess("Participante removido da despesa.");
+        } catch (err) {
+            console.error("Erro ao remover participante da despesa:", err);
+            showError("Não foi possível remover o participante.");
         }
     };
 
@@ -476,17 +493,19 @@ export default function TripDetails() {
                     onPageChange={setCurrentPage}
                     onEdit={(expense) => { setExpenseToEdit(expense); setIsAddExpenseOpen(true); }}
                     onDelete={setExpenseToDelete}
-                    onViewParticipants={setExpenseToView}
+                    onViewParticipants={(expense) => setExpenseToViewId(expense.id)}
                 />
             )}
 
             {trip && (
                 <ExpenseParticipantsModal
-                    open={!!expenseToView}
-                    onOpenChange={() => setExpenseToView(null)}
+                    open={!!expenseToViewId}
+                    onOpenChange={() => setExpenseToViewId(null)}
                     trip={trip}
                     profiles={profiles}
                     expense={expenseToView}
+                    canEdit={canEdit}
+                    onRemoveParticipant={(uid) => handleRemoveExpenseParticipant(expenseToView!.id, uid)}
                 />
             )}
 

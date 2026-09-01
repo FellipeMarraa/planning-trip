@@ -1,6 +1,6 @@
 // src/services/expenses.ts
 import { db } from '@/config/firebase';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, arrayRemove, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 export interface ExpensePayload {
     tripId: string;
@@ -32,4 +32,14 @@ export async function updateExpense(expenseId: string, payload: ExpensePayload) 
 
 export async function deleteExpense(expenseId: string) {
     await deleteDoc(doc(db, 'expenses', expenseId));
+}
+
+// Corrige divisão de despesas antigas quando um participante sai da viagem
+// via remoção direta (não via "sair da viagem", que já vira ghost em tudo) —
+// o total (amountBRL) não muda, só divide entre quem sobrou.
+export async function removeExpenseParticipant(expenseId: string, uid: string) {
+    await updateDoc(doc(db, 'expenses', expenseId), {
+        participants: arrayRemove(uid),
+        updatedAt: serverTimestamp(),
+    });
 }
