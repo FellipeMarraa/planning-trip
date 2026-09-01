@@ -12,6 +12,7 @@ interface AuthContextType {
     isGlobalAdmin: boolean; // Corrigindo o erro TS2339
     loginWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +47,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const logout = () => signOut(auth);
 
+    // `updateProfile`/`updateEmail` mutam auth.currentUser sem disparar
+    // onAuthStateChanged — sem isso, o resto do app (ex.: nome no header do
+    // Layout) só veria a mudança no próximo login. `reload()` + novo objeto
+    // no state força o re-render em quem lê `user` do contexto.
+    const refreshUser = async () => {
+        if (!auth.currentUser) return;
+        await auth.currentUser.reload();
+        // Novo objeto (mesmo protótipo, então getIdToken/etc continuam
+        // funcionando) só pra dar uma referência nova ao React — reload()
+        // muta auth.currentUser no lugar, sem isso o state não re-renderiza.
+        setUser(Object.assign(Object.create(Object.getPrototypeOf(auth.currentUser)), auth.currentUser));
+    };
+
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged((user) => {
             setUser(user);
@@ -62,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, isGlobalAdmin, loginWithGoogle, logout }}>
+        <AuthContext.Provider value={{ user, loading, isGlobalAdmin, loginWithGoogle, logout, refreshUser }}>
             {loading ? <PageLoader /> : children}
         </AuthContext.Provider>
     );

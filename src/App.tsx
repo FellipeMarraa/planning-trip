@@ -10,6 +10,7 @@ import PageLoader from './components/common/page-loader';
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
 const Login = lazy(() => import('./pages/Login'));
 const Sso = lazy(() => import('@/pages/Sso.tsx'));
+const Profile = lazy(() => import('@/pages/Profile.tsx'));
 const Dashboard = lazy(() => import('@/pages/Dashboard.tsx'));
 const TripDetails = lazy(() => import('@/pages/TripDetails.tsx'));
 const JoinTrip = lazy(() => import('@/pages/JoinTrip.tsx'));
@@ -76,6 +77,13 @@ export default function App() {
 
                     {/* Rota transitória de SSO vindo do CashZ: consome o custom token e redireciona */}
                     <Route path="/sso" element={<Sso />} />
+
+                    {/* Perfil do usuário */}
+                    <Route path="/profile" element={
+                        <ProtectedRoute>
+                            <Profile />
+                        </ProtectedRoute>
+                    } />
 
                     {/* Rota Principal: Dashboard */}
                     <Route path="/" element={

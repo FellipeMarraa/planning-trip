@@ -35,5 +35,5 @@ export const useCashzPlan = () => {
         return () => unsubscribe();
     }, [user]);
 
-    return { isPremium: isPlanActive(plan, planExpiresAt), loading };
+    return { isPremium: isPlanActive(plan, planExpiresAt), plan, planExpiresAt, loading };
 };

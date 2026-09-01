@@ -41,20 +41,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         <div className="h-5 w-px bg-border hidden sm:block" />
 
                         <div className="flex items-center gap-3">
-                            <div className="text-right hidden md:block leading-tight">
-                                <p className="text-sm font-medium text-foreground">{user?.displayName}</p>
-                                <p className="text-xs text-muted-foreground">{user?.email}</p>
-                            </div>
+                            <Link to="/profile" className="flex items-center gap-3 group">
+                                <div className="text-right hidden md:block leading-tight">
+                                    <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{user?.displayName}</p>
+                                    <p className="text-xs text-muted-foreground">{user?.email}</p>
+                                </div>
 
-                            <div className="w-9 h-9 rounded-full border border-border bg-muted overflow-hidden">
-                                {user?.photoURL ? (
-                                    <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <UserIcon className="w-4 h-4 text-muted-foreground" />
-                                    </div>
-                                )}
-                            </div>
+                                <div className="w-9 h-9 rounded-full border border-border bg-muted overflow-hidden">
+                                    {user?.photoURL ? (
+                                        <img src={user.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <UserIcon className="w-4 h-4 text-muted-foreground" />
+                                        </div>
+                                    )}
+                                </div>
+                            </Link>
 
                             <Button
                                 variant="ghost"
