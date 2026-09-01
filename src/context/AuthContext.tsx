@@ -1,5 +1,6 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
-import {auth} from '../config/firebase';
+import {auth, db} from '../config/firebase';
+import {doc, getDoc} from 'firebase/firestore';
 import {
     GoogleAuthProvider,
     signInWithPopup,
@@ -19,6 +20,7 @@ import {syncPlanFromCashz} from '../lib/planSync';
 
 interface AuthContextType {
     user: User | null;
+    customPhotoURL: string | null;
     loading: boolean;
     isGlobalAdmin: boolean; // Corrigindo o erro TS2339
     loginWithGoogle: () => Promise<void>;
@@ -36,8 +38,22 @@ const GLOBAL_ADMIN_EMAILS = ['fellipemarra.fm@gmail.com'];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [customPhotoURL, setCustomPhotoURL] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const { showError, showSuccess } = useToast();
+
+    // Foto customizada (upload próprio, guardada em base64 já que não há
+    // Firebase Storage no plano Spark — ver services/users.ts uploadAvatar)
+    // tem prioridade sobre `user.photoURL` (Google). Leitura única, não
+    // listener.
+    const loadCustomPhoto = async (uid: string) => {
+        try {
+            const snap = await getDoc(doc(db, 'users', uid));
+            setCustomPhotoURL(snap.data()?.photoBase64 || null);
+        } catch (error) {
+            console.error("Erro ao carregar foto customizada:", error);
+        }
+    };
 
     const isGlobalAdmin = user ? GLOBAL_ADMIN_EMAILS.includes(user.email || '') : false;
 
@@ -134,6 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // funcionando) só pra dar uma referência nova ao React — reload()
         // muta auth.currentUser no lugar, sem isso o state não re-renderiza.
         setUser(Object.assign(Object.create(Object.getPrototypeOf(auth.currentUser)), auth.currentUser));
+        await loadCustomPhoto(auth.currentUser.uid);
     };
 
     useEffect(() => {
@@ -142,9 +159,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
             if (user) {
                 upsertUserProfile(user).catch((error) => console.error("Erro ao salvar perfil:", error));
+                loadCustomPhoto(user.uid);
                 // Sincroniza plano em paralelo, sem bloquear o carregamento —
                 // cobre quem loga direto (sem passar pelo SSO do CashZ).
                 syncPlanFromCashz(user);
+            } else {
+                setCustomPhotoURL(null);
             }
         });
         return unsubscribe;
@@ -152,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, isGlobalAdmin, loginWithGoogle, loginWithEmail, register, resetPassword, logout, refreshUser }}>
+        <AuthContext.Provider value={{ user, customPhotoURL, loading, isGlobalAdmin, loginWithGoogle, loginWithEmail, register, resetPassword, logout, refreshUser }}>
             {loading ? <PageLoader /> : children}
         </AuthContext.Provider>
     );

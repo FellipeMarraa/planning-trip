@@ -5,6 +5,7 @@ export interface UserProfile {
     email: string;
     displayName: string;
     photoURL: string;
+    photoBase64?: string;
 }
 
 export interface Trip {

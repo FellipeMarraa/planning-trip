@@ -70,7 +70,7 @@ export function TripMembers({ trip, profiles, canEdit, isOwner, onChangeRole, on
                     const memberRole = trip.roles?.[uid] ?? (trip.ownerId === uid ? 'OWNER' : 'VIEWER');
                     const isMemberOwner = memberRole === 'OWNER';
                     const name = getMemberName(uid, trip, profiles);
-                    const photoURL = !isGhost ? profiles[uid]?.photoURL : undefined;
+                    const photoURL = !isGhost ? (profiles[uid]?.photoBase64 || profiles[uid]?.photoURL) : undefined;
 
                     const isEditingName = editingGhostUid === uid;
 

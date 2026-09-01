@@ -1,10 +1,10 @@
 // src/pages/Profile.tsx
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { updateProfile } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useCashzPlan } from '@/hooks/useCashzPlan';
-import { upsertUserProfile } from '@/services/users';
+import { upsertUserProfile, uploadAvatar } from '@/services/users';
 import { useToast } from '@/context/ToastContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,14 +20,34 @@ const PLAN_LABEL: Record<string, string> = {
 };
 
 export default function Profile() {
-    const { user, refreshUser } = useAuth();
+    const { user, customPhotoURL, refreshUser } = useAuth();
     const { isPremium, plan, planExpiresAt, loading: planLoading } = useCashzPlan();
     const { showError, showSuccess } = useToast();
 
     const [name, setName] = useState(user?.displayName || '');
     const [saving, setSaving] = useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const photoInputRef = useRef<HTMLInputElement>(null);
 
     const nameChanged = name.trim() !== '' && name !== (user?.displayName || '');
+
+    async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !user) return;
+
+        setUploadingPhoto(true);
+        try {
+            await uploadAvatar(user.uid, file);
+            await refreshUser();
+            showSuccess('Foto atualizada.');
+        } catch (error) {
+            console.error('Erro ao atualizar foto:', error);
+            showError('Não foi possível atualizar a foto. Tente novamente.');
+        } finally {
+            setUploadingPhoto(false);
+        }
+    }
 
     async function handleSave() {
         if (!auth.currentUser || !nameChanged) return;
@@ -55,10 +75,23 @@ export default function Profile() {
                 </CardHeader>
                 <CardContent className="space-y-5">
                     <div className="flex items-center gap-4">
-                        <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="size-16 text-lg" />
-                        <p className="text-xs text-muted-foreground">
-                            Foto vem da sua conta Google — pra trocar, atualize por lá.
-                        </p>
+                        <UserAvatar photoURL={customPhotoURL || user?.photoURL} name={user?.displayName} className="size-16 text-lg" />
+                        <input
+                            ref={photoInputRef}
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={handlePhotoChange}
+                        />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={uploadingPhoto}
+                            onClick={() => photoInputRef.current?.click()}
+                        >
+                            {uploadingPhoto && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Alterar foto
+                        </Button>
                     </div>
 
                     <div className="space-y-2">

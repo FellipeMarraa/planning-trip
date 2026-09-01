@@ -34,7 +34,7 @@ Não existe. Ver seção 1.3 — os `limit(...)` são teto, não paginação inc
 
 ## 4. Cloud Messaging / Storage
 
-Nenhum dos dois é usado pelo planning-trip hoje (nem `firebase/messaging` nem `firebase/storage` aparecem nas dependências ou no código).
+`firebase/messaging` não é usado. `firebase/storage` também não — decisão deliberada: desde out/2024 o Google exige plano Blaze (billing vinculado) pra habilitar/criar bucket novo em projetos, mesmo dentro do free tier, o que este projeto (Spark) não faz. O upload de foto de perfil (`src/services/users.ts` `uploadAvatar`) contorna isso: a imagem é redimensionada no client (`src/lib/image.ts`, crop quadrado 128px, JPEG q~0.75) e gravada como data URI base64 no campo `photoBase64` de `users/{uid}` — cabe de sobra no limite de 1MB por documento do Firestore. Se uma feature futura precisar de arquivo maior, esse padrão não escala — aí sim vale reavaliar Storage/Blaze.
 
 ## 5. Checklist antes de mergear qualquer mudança que toque Firestore
 

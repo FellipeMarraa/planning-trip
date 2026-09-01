@@ -75,10 +75,12 @@ interface Activity { id: string; tripId: string; dateId: string; time: string; l
 ### 2.5 `UserProfile` (coleção `users`)
 
 ```ts
-interface UserProfile { uid: string; email: string; displayName: string; photoURL: string; }
+interface UserProfile { uid: string; email: string; displayName: string; photoURL: string; photoBase64?: string; }
 ```
 
 Cache leve do perfil, separado do Firebase Auth, pra outros participantes conseguirem ler nome/foto de um membro sem precisar de Admin SDK. Upsertado a cada login (`setDoc(..., {merge:true})`), nunca deletado automaticamente.
+
+`photoBase64` é o avatar customizado (upload próprio via `uploadAvatar`, ver [FIREBASE.md](./FIREBASE.md) seção 4) — data URI JPEG, tem prioridade sobre `photoURL` (Google) na exibição. O upsert de login nunca escreve esse campo, só o próprio `uploadAvatar` — senão o próximo login apagaria a foto customizada.
 
 **Campos extras gravados mas fora dessa interface TS** (mesmo padrão de drift descrito em 2.2): o doc também carrega `plan?: 'free'|'premium'|'annual'`, `planExpiresAt?: string|null` e `planSyncedAt?: Timestamp` — status de plano sincronizado do CashZ (ver [SECURITY.md](./SECURITY.md) seção 5), escritos só pelo Admin SDK do CashZ, nunca pelo client (`services/users.ts` não os conhece). Um doc de usuário que nunca fez SSO nem teve o próprio `plan-status` sincronizado simplesmente não tem esses campos — trate ausência como "desconhecido/free", nunca como erro.
 

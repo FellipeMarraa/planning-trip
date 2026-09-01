@@ -125,10 +125,10 @@ service cloud.firestore {
       // CashZ escreve esses campos (bypassa regra). O client só mexe no
       // próprio perfil.
       allow create: if isSignedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL']);
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'photoBase64']);
 
       allow update: if isSignedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'email', 'displayName', 'photoURL']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'photoBase64']);
     }
 
     match /settlements/{settlementId} {

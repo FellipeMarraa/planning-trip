@@ -11,7 +11,7 @@ import { UserAvatar } from '@/components/common/user-avatar';
 const AiAssistantWidget = lazy(() => import('@/ai/components/AiAssistantWidget').then((m) => ({ default: m.AiAssistantWidget })));
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-    const { user, logout, isGlobalAdmin } = useAuth();
+    const { user, customPhotoURL, logout, isGlobalAdmin } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = async () => {
@@ -51,7 +51,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                                 </div>
 
-                                <UserAvatar photoURL={user?.photoURL} name={user?.displayName} className="size-9" />
+                                <UserAvatar photoURL={customPhotoURL || user?.photoURL} name={user?.displayName} className="size-9" />
                             </Link>
 
                             <Button
