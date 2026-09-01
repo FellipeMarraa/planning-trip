@@ -1,10 +1,11 @@
 // src/App.tsx
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import Layout from './components/layout/Layout';
 import PageLoader from './components/common/page-loader';
+import { CHUNK_RELOAD_FLAG, ErrorBoundary } from './components/common/error-boundary';
 
 // Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
@@ -62,10 +63,17 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
+    useEffect(() => {
+        // Chegou até aqui de boot novo sem cair no ErrorBoundary — limpa a
+        // flag pra um deploy futuro poder disparar o auto-reload de novo.
+        sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
+    }, []);
+
     return (
         <ToastProvider>
         <AuthProvider>
             <Router>
+                <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                     {/* Rota de Login */}
@@ -124,6 +132,7 @@ export default function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
                 </Suspense>
+                </ErrorBoundary>
             </Router>
         </AuthProvider>
         </ToastProvider>

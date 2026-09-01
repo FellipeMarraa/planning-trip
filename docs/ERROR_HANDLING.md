@@ -1,6 +1,6 @@
 # ERROR_HANDLING.md — Padrão real de tratamento de erro
 
-> Descreve o que existe hoje. Não há error boundary nem interceptor global — cada camada trata o erro localmente.
+> Descreve o que existe hoje. Há um error boundary (ver seção 3) protegendo a árvore inteira contra erro de render não capturado; fora isso, cada camada trata o erro localmente.
 
 ## 1. Frontend — chamadas de service (formulários/diálogos)
 
@@ -19,9 +19,12 @@ try {
 
 **Débito conhecido**: inconsistente entre hooks. `useTrip.ts` passa um callback de erro ao `onSnapshot` que faz `console.error` **e** seta um estado local de erro surfaced na UI (mensagem tipo "Acesso negado à viagem."). `useActivities.ts` e a assinatura por-perfil em `useUserProfiles.ts` só fazem `console.error`, sem estado de erro visível — se a leitura falhar (ex.: regra negou acesso), a UI fica silenciosamente sem dado, sem avisar o usuário. Ao criar um hook de leitura novo, seguir o padrão de `useTrip.ts` (surfaced error), não o silencioso.
 
-## 3. Não existe error boundary de React
+## 3. Error boundary de React
 
-Nenhum `ErrorBoundary`/equivalente a um "GlobalErrorInterceptor" (como o do CashZ) — um erro de render não capturado quebra a árvore de componentes inteira sem fallback. Não é um problema resolvido hoje; ver [ROADMAP.md](./ROADMAP.md) se isso virar prioridade.
+`src/components/common/error-boundary.tsx` (`ErrorBoundary`, class component) envolve `<Suspense>`/`<Routes>` em `App.tsx` — acima do Suspense, porque é ali que uma falha de `React.lazy()` (import dinâmico) é lançada no render. Trata dois casos:
+
+1. **Falha de chunk lazy-loaded pós-deploy** (`Failed to fetch dynamically imported module` e variantes): cada deploy troca o hash dos arquivos JS; uma aba aberta de antes do deploy busca um chunk que não existe mais. Detecta pela mensagem do erro e recarrega a página automaticamente **uma vez** (`sessionStorage` guarda a flag `plt_chunk_reload_attempted`, limpa no boot seguinte bem-sucedido, em `App.tsx`, pra não mascarar um erro real como loop de reload). Sem isso, o usuário via tela branca e só resolvia fechando e reabrindo o site — era a causa real de um bug relatado ao abrir `/profile`.
+2. **Qualquer outro erro não capturado**: fallback visual (ícone + mensagem + botão "Recarregar"), sem reload automático — não mascarar um bug de verdade.
 
 ## 4. Backend (o único que existe: o endpoint de SSO no CashZ)
 

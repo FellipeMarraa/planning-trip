@@ -11,7 +11,7 @@
 ## 2. Médio prazo (próximos meses)
 
 1. Primeiro teste automatizado (ver [TESTS.md](./TESTS.md) seção 3, prioridade 1: `firestore.rules`).
-2. Error boundary de React (ver [ERROR_HANDLING.md](./ERROR_HANDLING.md) seção 3) — hoje um erro de render não capturado derruba a árvore inteira.
+2. ~~Error boundary de React~~ — **feito**: `src/components/common/error-boundary.tsx`, envolve `<Suspense>`/`<Routes>` em `App.tsx`. Trata em especial falha de chunk lazy-loaded pós-deploy (recarrega a página automaticamente uma vez) — era a causa real da tela branca ao abrir `/profile` reportada pelo usuário.
 3. Padronizar tratamento de erro de `onSnapshot` entre hooks (ver [ERROR_HANDLING.md](./ERROR_HANDLING.md) seção 2).
 
 ## 3. Longo prazo (quando o volume de usuários justificar)
