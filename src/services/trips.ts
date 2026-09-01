@@ -124,12 +124,12 @@ export async function addGhostMember(tripId: string, name: string) {
 
 export async function linkGhostToUser(tripId: string, ghostUid: string, realUid: string) {
     // Nota: getDocs + writeBatch aqui não é atômico com escritas concorrentes —
-    // uma despesa criada para o ghostUid *entre* o getDocs e o commit não seria
-    // migrada (ficaria com o uid fantasma órfão). Janela mínima (sem await no
-    // meio), mas uma correção 100% atômica exigiria Cloud Function/transação no
-    // servidor, fora do escopo do plano Spark gratuito. Impacto se acontecer: a
-    // despesa some do participants/roles do fantasma, mas continua existindo —
-    // basta reeditar o "pago por" dela manualmente.
+    // uma despesa/acerto criado para o ghostUid *entre* o getDocs e o commit não
+    // seria migrado (ficaria com o uid fantasma órfão). Janela mínima (sem await
+    // no meio de cada loop), mas uma correção 100% atômica exigiria Cloud
+    // Function/transação no servidor, fora do escopo do plano Spark gratuito.
+    // Impacto se acontecer: o registro some do participants/roles do fantasma,
+    // mas continua existindo — basta reeditar manualmente.
     const tripRef = doc(db, 'trips', tripId);
     const tripSnap = await getDoc(tripRef);
     if (!tripSnap.exists()) return;
@@ -143,11 +143,9 @@ export async function linkGhostToUser(tripId: string, ghostUid: string, realUid:
         const participants: string[] = data.participants || [];
         return data.paidBy === ghostUid || participants.includes(ghostUid);
     });
-    const batches = chunk(expensesToMigrate, BATCH_LIMIT);
-
-    for (let i = 0; i < batches.length; i++) {
+    for (const batchDocs of chunk(expensesToMigrate, BATCH_LIMIT)) {
         const batch = writeBatch(db);
-        batches[i].forEach((expenseDoc) => {
+        batchDocs.forEach((expenseDoc) => {
             const data = expenseDoc.data();
             const participants: string[] = data.participants || [];
             batch.update(expenseDoc.ref, {
@@ -155,14 +153,33 @@ export async function linkGhostToUser(tripId: string, ghostUid: string, realUid:
                 participants: participants.map((uid) => (uid === ghostUid ? realUid : uid)),
             });
         });
-        if (i === batches.length - 1) {
-            batch.update(tripRef, {
-                participants: nextParticipants,
-                [`ghosts.${ghostUid}`]: deleteField(),
-            });
-        }
         await batch.commit();
     }
+
+    // Mesma migração que leaveTripAsGhost já faz na direção inversa — sem isso,
+    // vincular um fantasma de volta a um usuário real deixava acertos de dívida
+    // (settlements) apontando pro uid fantasma, órfãos.
+    const settlementsSnap = await getDocs(query(collection(db, 'settlements'), where('tripId', '==', tripId)));
+    const settlementsToMigrate = settlementsSnap.docs.filter((settlementDoc) => {
+        const data = settlementDoc.data();
+        return data.from === ghostUid || data.to === ghostUid;
+    });
+    for (const batchDocs of chunk(settlementsToMigrate, BATCH_LIMIT)) {
+        const batch = writeBatch(db);
+        batchDocs.forEach((settlementDoc) => {
+            const data = settlementDoc.data();
+            batch.update(settlementDoc.ref, {
+                from: data.from === ghostUid ? realUid : data.from,
+                to: data.to === ghostUid ? realUid : data.to,
+            });
+        });
+        await batch.commit();
+    }
+
+    await updateDoc(tripRef, {
+        participants: nextParticipants,
+        [`ghosts.${ghostUid}`]: deleteField(),
+    });
 }
 
 export async function leaveTripAsGhost(tripId: string, uid: string, displayName: string) {

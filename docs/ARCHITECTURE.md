@@ -60,10 +60,10 @@ export function isGhostUid(uid: string) {
 Três operações tocam esse padrão, todas em `src/services/trips.ts`:
 
 1. **`addGhostMember`** — cria um ghost direto.
-2. **`linkGhostToUser`** — liga um ghost a um usuário real depois que ele entra no app; migra as **despesas** que referenciam o ghost (`paidBy`/`participants`) pro uid real, em lotes de 499 (limite de 500 por `writeBatch`).
+2. **`linkGhostToUser`** — liga um ghost a um usuário real depois que ele entra no app; migra **despesas e acertos** que referenciam o ghost (`paidBy`/`participants` em `expenses`, `from`/`to` em `settlements`) pro uid real, em lotes de 499 (limite de 500 por `writeBatch`).
 3. **`leaveTripAsGhost`** — o inverso: quando um usuário real sai da viagem, seu uid é trocado por um novo ghost em **despesas e acertos**, preservando o histórico financeiro pros demais.
 
-**Débito conhecido**: `linkGhostToUser` migra só `expenses`; `leaveTripAsGhost` migra `expenses` **e** `settlements`. Mesma classe de operação (trocar um uid por outro em todo lugar que aparece), cobertura assimétrica — um ghost vinculado de volta a um usuário real fica com `settlements` órfãos referenciando o uid antigo do ghost. Ver [ROADMAP.md](./ROADMAP.md).
+Mesma classe de operação nas duas direções (trocar um uid por outro em todo lugar que aparece, despesas e acertos), cobertura simétrica desde que `linkGhostToUser` passou a migrar `settlements` também (ver [ROADMAP.md](./ROADMAP.md)).
 
 Nenhuma dessas migrações é atômica (comentário explícito em `linkGhostToUser`: `getDocs` + `writeBatch` não é atômico contra escrita concorrente) — aceito conscientemente porque uma correção 100% atômica exigiria Cloud Function/transação server-side, fora do plano Spark gratuito (ver [FIREBASE.md](./FIREBASE.md)).
 

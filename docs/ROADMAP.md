@@ -4,7 +4,7 @@
 
 ## 1. Curto prazo (próximas semanas)
 
-1. **[ARCHITECTURE.md 5] Corrigir assimetria `linkGhostToUser`/`leaveTripAsGhost`**: `linkGhostToUser` só migra `expenses`, deveria migrar `settlements` também, como `leaveTripAsGhost` já faz — hoje um ghost vinculado de volta a um usuário real pode ficar com acertos de dívida órfãos.
+1. ~~**[ARCHITECTURE.md 5] Corrigir assimetria `linkGhostToUser`/`leaveTripAsGhost`**~~ — **feito**: `linkGhostToUser` (`src/services/trips.ts`) agora migra `settlements` também (mesmo padrão de `leaveTripAsGhost`), antes de atualizar `participants`/`ghosts` da trip.
 2. **[DATABASE.md 2.2] Resolver o drift de `Expense.status`/`exchangeRateAtTime`**: campos existem no tipo mas nunca são escritos pelo service — ou a feature de status pendente/reservado é ligada na UI, ou os campos são removidos do tipo.
 3. **[ARCHITECTURE.md 2] Decidir o destino de `services/auth.ts`**: arquivo vazio, lógica real em `AuthContext.tsx` — preencher ou remover.
 
