@@ -148,6 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 userId: uid,
                 tripId: tripId ?? null,
                 title: message.slice(0, 60),
+                archived: false,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });

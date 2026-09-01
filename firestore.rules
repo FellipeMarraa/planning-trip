@@ -134,11 +134,16 @@ service cloud.firestore {
     }
 
     match /ai_threads/{threadId} {
-      // Só o backend (Admin SDK, api/ai/chat.ts) escreve — cliente só lê a
-      // própria conversa. Igual ao padrão de users/{uid} pra plan/planExpiresAt:
-      // conteúdo gerado por processo controlado, nunca aceito direto do client.
+      // Só o backend (Admin SDK, api/ai/chat.ts) cria/edita conteúdo — cliente
+      // só lê a própria conversa. Igual ao padrão de users/{uid} pra
+      // plan/planExpiresAt: conteúdo gerado por processo controlado, nunca
+      // aceito direto do client — exceto "arquivar" (esconder da lista), que
+      // é só um campo booleano do próprio dono, mesmo padrão de
+      // diff().affectedKeys().hasOnly([...]) usado em trips/expenses/settlements.
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow write: if false;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['archived']);
+      allow create, delete: if false;
     }
 
     match /ai_messages/{messageId} {

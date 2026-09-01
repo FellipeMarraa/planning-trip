@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { useToast } from '@/context/ToastContext';
 import { createActivity } from '@/services/activities';
 import { CalendarPlus, Check } from 'lucide-react';
-import type { SuggestedActivity } from '../hooks/useAIChat';
+import type { SuggestedActivity } from '../types';
 
 // Nunca a IA escreve isto sozinha — cada item exige o clique do usuário
 // aqui, que chama o service já existente (services/activities.ts), o mesmo
