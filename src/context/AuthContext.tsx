@@ -3,6 +3,7 @@ import {auth} from '../config/firebase';
 import {GoogleAuthProvider, signInWithPopup, signOut, type User} from 'firebase/auth';
 import {upsertUserProfile} from '../services/users';
 import {useToast} from './ToastContext';
+import PageLoader from '../components/common/page-loader';
 
 interface AuthContextType {
     user: User | null;
@@ -58,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return (
         <AuthContext.Provider value={{ user, loading, isGlobalAdmin, loginWithGoogle, logout }}>
-            {!loading && children}
+            {loading ? <PageLoader /> : children}
         </AuthContext.Provider>
     );
 };

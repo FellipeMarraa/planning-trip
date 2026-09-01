@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useSearc
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import Layout from './components/layout/Layout';
+import PageLoader from './components/common/page-loader';
 
 // Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
@@ -13,12 +14,6 @@ const Dashboard = lazy(() => import('@/pages/Dashboard.tsx'));
 const TripDetails = lazy(() => import('@/pages/TripDetails.tsx'));
 const JoinTrip = lazy(() => import('@/pages/JoinTrip.tsx'));
 const TripItineraryPage = lazy(() => import('@/pages/TripItineraryPage.tsx'));
-
-const PageLoader = () => (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-    </div>
-);
 
 const GlobalAdminPlaceholder = () => (
     <div className="space-y-2">
