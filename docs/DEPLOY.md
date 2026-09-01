@@ -37,7 +37,7 @@ Configuradas no Vercel do **planning-trip**, nunca no do CashZ — esse backend 
 ## 4. Firebase — configuração que não vive no repositório
 
 - Regras de segurança (`firestore.rules`) exigem deploy manual: `firebase deploy --only firestore:rules --project planning-trip-6a9cb`. Não é automático pelo pipeline do Vercel.
-- Não existe `firestore.indexes.json` — nenhum índice composto foi necessário até hoje (ver [DATABASE.md](./DATABASE.md) seção 5).
+- `firestore.indexes.json` também exige deploy manual: `firebase deploy --only firestore:indexes --project planning-trip-6a9cb` (ver [DATABASE.md](./DATABASE.md) seção 5) — não é automático pelo pipeline do Vercel, igual às regras.
 - Login habilitado no Firebase Auth: só Google (ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 4) — qualquer provedor novo precisa ser habilitado manualmente no console do Firebase antes de aparecer no código.
 
 ## 5. Dependência cruzada com o CashZ (SSO)
@@ -54,3 +54,4 @@ Reverter pelo painel do Vercel (redeploy de um build anterior) ou `git revert` +
 2. Mudou o formato de algum documento (`Trip`/`Expense`/`Settlement`/`Activity`)? Conferir se despesas/viagens já existentes continuam legíveis com o formato novo — não há migração automática de dado existente.
 3. Mudou algo no fluxo de SSO? Revisar também o lado do CashZ (seção 5) antes de considerar a mudança completa.
 4. Mudou algo em `api/*.ts`? Rodar `npx tsc --noEmit` manualmente nesses arquivos antes do push — `npm run build` não pega erro de tipo lá (seção 2).
+5. Query nova com filtro de igualdade + `orderBy`/`array-contains`? Rodar localmente (ou testar em produção) antes de considerar pronto — se faltar índice, o erro só aparece em runtime (`FAILED_PRECONDITION`). Adicionar em `firestore.indexes.json` e `firebase deploy --only firestore:indexes` no mesmo commit, nunca só clicar no link de criação que o próprio erro oferece.

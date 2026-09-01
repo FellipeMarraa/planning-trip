@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/config/firebase';
 import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useAuth } from '@/context/AuthContext';
 import { sendChatMessage } from '../services/aiChatService';
 
 export interface SuggestedActivity {
@@ -18,16 +19,24 @@ export interface AIMessage {
 }
 
 export function useAIChat(tripId?: string) {
+    const { user } = useAuth();
     const [threadId, setThreadId] = useState<string | undefined>(undefined);
     const [messages, setMessages] = useState<AIMessage[]>([]);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!threadId) return;
+        if (!threadId || !user) return;
 
+        // firestore.rules exige `resource.data.userId == auth.uid` pra ler
+        // ai_messages — pra uma QUERY (não um get por id), o Firestore só
+        // consegue provar isso sem ler cada doc se a própria query já
+        // filtrar pelo mesmo campo que a regra checa. Sem o where(userId),
+        // a lista inteira é negada com "Missing or insufficient permissions",
+        // mesmo que cada doc individualmente pertencesse ao usuário.
         const q = query(
             collection(db, 'ai_messages'),
+            where('userId', '==', user.uid),
             where('threadId', '==', threadId),
             orderBy('createdAt', 'asc')
         );
@@ -39,7 +48,7 @@ export function useAIChat(tripId?: string) {
         });
 
         return () => unsubscribe();
-    }, [threadId]);
+    }, [threadId, user]);
 
     async function send(message: string) {
         setSending(true);
