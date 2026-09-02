@@ -33,29 +33,30 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Lista de e-mails que são ADM_GLOBAL (Root)
-const GLOBAL_ADMIN_EMAILS = ['fellipemarra.fm@gmail.com'];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [customPhotoURL, setCustomPhotoURL] = useState<string | null>(null);
+    const [isGlobalAdmin, setIsGlobalAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
     const { showError, showSuccess } = useToast();
 
-    // Foto customizada (upload próprio, guardada em base64 já que não há
-    // Firebase Storage no plano Spark — ver services/users.ts uploadAvatar)
-    // tem prioridade sobre `user.photoURL` (Google). Leitura única, não
-    // listener.
-    const loadCustomPhoto = async (uid: string) => {
+    // Foto customizada (upload próprio, ver services/users.ts uploadAvatar) e
+    // `isAdmin` moram no mesmo doc — 1 leitura só. `isAdmin` nunca é gravável
+    // pelo client (fora da whitelist de campos da regra de update/create de
+    // users/{uid}, ver firestore.rules) — só setado manualmente no Firebase
+    // Console, já que este app não tem backend próprio pra automatizar isso.
+    // Diferente da versão anterior (lista de e-mail hardcoded no bundle),
+    // quem decide de verdade é a regra do Firestore (isGlobalAdmin() lá),
+    // isso aqui só reflete o mesmo campo pra UI mostrar/esconder o ícone.
+    const loadProfileExtras = async (uid: string) => {
         try {
             const snap = await getDoc(doc(db, 'users', uid));
             setCustomPhotoURL(snap.data()?.photoBase64 || null);
+            setIsGlobalAdmin(snap.data()?.isAdmin === true);
         } catch (error) {
-            console.error("Erro ao carregar foto customizada:", error);
+            console.error("Erro ao carregar dados do perfil:", error);
         }
     };
-
-    const isGlobalAdmin = user ? GLOBAL_ADMIN_EMAILS.includes(user.email || '') : false;
 
     const loginWithGoogle = async () => {
         // Popup em vez de redirect: o redirect quebra em Safari 16.1+/Chrome 115+/
@@ -150,22 +151,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // funcionando) só pra dar uma referência nova ao React — reload()
         // muta auth.currentUser no lugar, sem isso o state não re-renderiza.
         setUser(Object.assign(Object.create(Object.getPrototypeOf(auth.currentUser)), auth.currentUser));
-        await loadCustomPhoto(auth.currentUser.uid);
+        await loadProfileExtras(auth.currentUser.uid);
     };
 
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged((user) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setUser(user);
-            setLoading(false);
             if (user) {
                 upsertUserProfile(user).catch((error) => console.error("Erro ao salvar perfil:", error));
-                loadCustomPhoto(user.uid);
+                // Aguarda antes de liberar a UI (loading=false) — sem isso,
+                // ProtectedRoute checaria isGlobalAdmin antes do getDoc
+                // resolver e mandaria embora quem é admin de verdade.
+                await loadProfileExtras(user.uid);
                 // Sincroniza plano em paralelo, sem bloquear o carregamento —
                 // cobre quem loga direto (sem passar pelo SSO do CashZ).
                 syncPlanFromCashz(user);
             } else {
                 setCustomPhotoURL(null);
+                setIsGlobalAdmin(false);
             }
+            setLoading(false);
         });
         return unsubscribe;
         // eslint-disable-next-line react-hooks/exhaustive-deps

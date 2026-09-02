@@ -6,6 +6,7 @@ export interface UserProfile {
     displayName: string;
     photoURL: string;
     photoBase64?: string;
+    isAdmin?: boolean;
 }
 
 export interface Trip {

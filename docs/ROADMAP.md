@@ -18,7 +18,7 @@
 
 1. Paginação real (`startAfter`) se algum `limit(1000)` (ver [PERFORMANCE.md](./PERFORMANCE.md) seção 3) começar a ser um teto real, não teórico.
 2. ~~Log estruturado/remoto~~ — **feito** (2026-09-02, motivado pelo app deixar de ser uso pessoal só do dono): `client_logs` (Firestore, gate por `isGlobalAdmin()` na regra) + `ErrorBoundary`/`GlobalErrorInterceptor` reportando erro de render e assíncrono. Ver [LOGGING.md](./LOGGING.md) seção 4.
-3. **Migrar admin de e-mail hardcoded pra campo `isAdmin`/custom claim** — `/admin` ganhou ação real (2026-09-02: `client_logs`, contagem de `trips`/`users`), o trigger que este item esperava. Ainda hardcoded (duplicado em `AuthContext.tsx` + `firestore.rules`) porque só existe 1 admin hoje — vira prioridade real no dia em que precisar de um segundo. Ver [SECURITY.md](./SECURITY.md) seção 3.
+3. ~~Migrar admin de e-mail hardcoded pra campo `isAdmin`/custom claim~~ — **feito** (2026-09-02): `users/{uid}.isAdmin`, fora da whitelist de campos client-graváveis, checado em `isGlobalAdmin()` no `firestore.rules`. Setado manualmente no Firebase Console (sem backend pra automatizar). Ver [SECURITY.md](./SECURITY.md) seção 3.
 
 ## 4. Fora de escopo até segunda ordem
 

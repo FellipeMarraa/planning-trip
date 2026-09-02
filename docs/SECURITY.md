@@ -19,11 +19,13 @@
 - **Catch-all final** (`match /{document=**} { allow read, write: if false; }`) — qualquer coleção nova sem regra explícita é negada por padrão, não permitida. Ver [DATABASE.md](./DATABASE.md) seção 6.
 - **`client_logs`**: `create` autoatribuído (`request.resource.data.userId == request.auth.uid`, nunca em nome de outro uid) pra qualquer logado, `read`/`delete` só `isGlobalAdmin()`, `update` sempre negado (log é escrito uma vez, nunca editado).
 
-## 3. Admin global — allowlist de e-mail hardcoded, mas enforced no servidor
+## 3. Admin global — campo `isAdmin`, enforced no servidor
 
-`/admin` agora tem ação real (ver `src/pages/Admin.tsx`): lê/apaga `client_logs`, lê contagem de `trips`/`users`. Diferente de antes (quando `/admin` era placeholder), a checagem de admin **não é só client-side** — `isGlobalAdmin` em `src/context/AuthContext.tsx` (`GLOBAL_ADMIN_EMAILS`) só decide o que a UI mostra; quem decide de verdade é `isGlobalAdmin()` em `firestore.rules` (`request.auth.token.email == '...'`), que gate `client_logs` (`read`/`delete`) e a leitura de `trips` fora do próprio participante. Um client comprometido não contorna isso — a regra roda no servidor.
+`/admin` tem ação real (ver `src/pages/Admin.tsx`): lê/apaga `client_logs`, lê contagem de `trips`/`users`. A checagem de admin **não é client-side** — `isGlobalAdmin()` em `firestore.rules` lê `users/{uid}.isAdmin == true` (mesmo padrão do `isAdmin()` do CashZ) e gate `client_logs` (`read`/`delete`) e a leitura de `trips` fora do próprio participante. `isGlobalAdmin` em `src/context/AuthContext.tsx` só espelha esse mesmo campo (1 `getDoc` já feito pra carregar `photoBase64`) pra UI mostrar/esconder o ícone — quem decide de verdade é a regra.
 
-**Débito conhecido**: o e-mail do admin é um literal hardcoded, duplicado em dois lugares (`AuthContext.tsx` e `firestore.rules`) — precisam ser mantidos manualmente em sincronia, e trocar/adicionar um admin exige editar código + redeploy de regra, não um campo em doc nem um custom claim do Firebase Auth. Aceitável hoje (um único admin, sem backend próprio pra gerenciar custom claims) — se isso crescer pra múltiplos admins, migrar pra um campo `isAdmin` num doc (checado em `firestore.rules`, mesmo padrão do CashZ) em vez de duplicar mais e-mails na regra.
+**Diferente do CashZ**: lá, `user_preferences.isAdmin` está dentro do range de campos que o próprio client pode gravar no seu doc (`allow write: if request.auth.uid == userId`, sem whitelist de campo) — teoricamente um usuário poderia setar `isAdmin: true` no próprio doc via SDK direto (não avaliado/corrigido aqui, é do outro repo). No planning-trip isso foi evitado desde o início: `isAdmin` está **fora** da whitelist de `users/{uid}` (`hasOnly(['uid','email','displayName','photoURL','photoBase64'])`, seção 2) — o client nunca pode gravar esse campo em si mesmo nem em ninguém, criação ou update.
+
+**Como setar um admin**: sem backend próprio pra automatizar (ver [ROADMAP.md](./ROADMAP.md) seção 4), é manual — Firebase Console → Firestore → `users/{uid da pessoa}` → adicionar campo `isAdmin` (boolean) `true`. Efeito imediato na próxima leitura da regra (sem precisar de redeploy).
 
 ## 4. SSO com o CashZ — trust boundary novo
 

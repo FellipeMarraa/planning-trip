@@ -7,12 +7,15 @@ service cloud.firestore {
     }
 
     // Admin GLOBAL do sistema (quem criou/mantém o app) — NÃO tem relação
-    // nenhuma com ser dono de uma viagem (trips/{id}.ownerId). Mesma lista
-    // hardcoded que src/context/AuthContext.tsx (GLOBAL_ADMIN_EMAILS) — sem
-    // backend próprio pra custom claim, então os dois têm que ser mantidos
-    // em sincronia manualmente se o e-mail do admin mudar.
+    // nenhuma com ser dono de uma viagem (trips/{id}.ownerId). Campo
+    // `isAdmin` em users/{uid}, igual ao isAdmin() do CashZ — mas diferente
+    // de lá, aqui o client NUNCA pode gravar `isAdmin` (fora da whitelist de
+    // campos da regra de users abaixo), só setável manualmente no Firebase
+    // Console (sem backend próprio pra automatizar isso).
     function isGlobalAdmin() {
-      return isSignedIn() && request.auth.token.email == 'fellipemarra.fm@gmail.com';
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
 
     function tripData(tripId) {
