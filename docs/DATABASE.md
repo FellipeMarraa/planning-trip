@@ -57,10 +57,13 @@ Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a t
 ### 2.3 `Settlement`
 
 ```ts
-interface Settlement { id: string; tripId: string; from: string; to: string; amount: number; createdAt: number; }
+interface Settlement { id: string; tripId: string; from: string; to: string; amount: number; createdAt: number; allocations?: SettlementAllocation[]; }
+interface SettlementAllocation { expenseId: string; uid: string; amount: number; }
 ```
 
-`amount` é sempre em BRL (comentário no tipo). Representa "`from` pagou `to`" — um registro de quitação de dívida, não uma despesa.
+`amount` é sempre em BRL (comentário no tipo). Representa "`from` pagou `to`" — um registro de quitação de dívida, não uma despesa. `allocations` (opcional) diz a quais cotas específicas (despesa + participante) esse valor se refere — metadado de exibição só, a lista detalhada de dívidas (`MemberDebtModal.tsx`) usa isso pra saber exatamente qual item já foi coberto, mas **o saldo total nunca depende disso** — `computeTripBalances`/`firestore.rules` continuam usando só `amount` cru. Acerto sem `allocations` (dado anterior a essa feature, ou pagamento sem vínculo com item nenhum) ainda abate do total de forma genérica.
+
+Quem pode registrar: qualquer `OWNER`/`EDITOR` da viagem, entre **quaisquer** dois participantes (não precisa ser uma das partes envolvidas) — é o que permite um editor "marcar como pago" a dívida de outra pessoa. `VIEWER` nunca cria acerto nenhum.
 
 ### 2.4 `Activity`
 

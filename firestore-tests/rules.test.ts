@@ -357,7 +357,7 @@ describe('firestore.rules — expenses (canEdit)', () => {
     });
 });
 
-describe('firestore.rules — settlements create exige to == request.auth.uid', () => {
+describe('firestore.rules — settlements create (canEdit gerencia qualquer par de participantes)', () => {
     it('quem recebe registra o próprio acerto', async () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
@@ -370,14 +370,44 @@ describe('firestore.rules — settlements create exige to == request.auth.uid', 
         );
     });
 
-    it('não pode registrar acerto em nome de outro recebedor', async () => {
+    it('editor registra acerto em que ele é quem pagou (from), não só quem recebeu', async () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
         });
 
-        await assertFails(
+        await assertSucceeds(
             addDoc(collection(asUser('editor-1'), 'settlements'), {
                 tripId: 'trip-1', from: 'editor-1', to: 'owner-1', amount: 50,
+            })
+        );
+    });
+
+    it('editor registra acerto entre DUAS outras pessoas (nem from nem to é ele) — "marcar como pago" em nome de outro', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip({
+                participants: ['owner-1', 'editor-1', 'viewer-1'],
+                roles: { 'owner-1': 'OWNER', 'editor-1': 'EDITOR', 'viewer-1': 'VIEWER' },
+            }));
+        });
+
+        await assertSucceeds(
+            addDoc(collection(asUser('editor-1'), 'settlements'), {
+                tripId: 'trip-1', from: 'viewer-1', to: 'owner-1', amount: 30,
+            })
+        );
+    });
+
+    it('viewer não registra nenhum acerto, nem o próprio', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip({
+                participants: ['owner-1', 'viewer-1'],
+                roles: { 'owner-1': 'OWNER', 'viewer-1': 'VIEWER' },
+            }));
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('viewer-1'), 'settlements'), {
+                tripId: 'trip-1', from: 'viewer-1', to: 'owner-1', amount: 30,
             })
         );
     });
@@ -414,6 +444,18 @@ describe('firestore.rules — settlements create exige to == request.auth.uid', 
         await assertFails(
             addDoc(collection(asUser('editor-1'), 'settlements'), {
                 tripId: 'trip-1', from: 'stranger-1', to: 'editor-1', amount: 50,
+            })
+        );
+    });
+
+    it('não cria acerto pra alguém (to) que não é participante da viagem', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'settlements'), {
+                tripId: 'trip-1', from: 'owner-1', to: 'stranger-1', amount: 50,
             })
         );
     });

@@ -159,15 +159,18 @@ service cloud.firestore {
 
     match /settlements/{settlementId} {
       allow read: if isParticipant(resource.data.tripId);
-      // Mesmo raciocínio de expenses: `to == request.auth.uid` já garante que
-      // quem recebe é participante (canEdit exige role), mas nada validava
-      // `amount`/`from` antes — um acerto de valor negativo/zero, ou de
-      // alguém que nem está na viagem, corrompia o saldo calculado.
+      // Owner/editor pode registrar acerto entre QUAISQUER dois participantes
+      // da viagem, não só envolvendo o próprio uid — é exatamente o caso de
+      // "marcar como pago" no modal de despesa (o editor cobre a dívida de
+      // outra pessoa em nome dela). Só `to == request.auth.uid` (removido)
+      // bloquearia esse fluxo. Mesmo raciocínio de expenses pro resto: nada
+      // validava `amount`/`from`/`to` antes — um acerto de valor negativo/
+      // zero, ou de alguém que nem está na viagem, corrompia o saldo calculado.
       allow create: if canEdit(request.resource.data.tripId)
-        && request.resource.data.to == request.auth.uid
         && request.resource.data.amount is number && request.resource.data.amount > 0
         && request.resource.data.from != request.resource.data.to
-        && request.resource.data.from in tripData(request.resource.data.tripId).participants;
+        && request.resource.data.from in tripData(request.resource.data.tripId).participants
+        && request.resource.data.to in tripData(request.resource.data.tripId).participants;
       allow delete: if canEdit(resource.data.tripId);
       allow update: if canEdit(resource.data.tripId) || (
         // Sair da viagem: o próprio participante troca seu uid por um fantasma

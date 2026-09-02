@@ -59,7 +59,7 @@ import AddExpenseDialog from '@/components/trip/AddExpenseDialog';
 import EditTripDialog from '@/components/trip/EditTripDialog';
 import TripAnalytics from '@/components/trip/TripAnalytics';
 import { formatDateBR } from '@/lib/dates';
-import type { Expense, UserRole } from '@/types';
+import type { Expense, SettlementAllocation, UserRole } from '@/types';
 
 export default function TripDetails() {
     const { tripId } = useParams();
@@ -320,13 +320,26 @@ export default function TripDetails() {
         }
     };
 
-    const handleSettle = async (from: string, to: string, amount: number) => {
+    const handleSettle = async (from: string, to: string, amount: number, allocations: SettlementAllocation[]) => {
         if (!tripId) return;
         try {
-            await createSettlement(tripId, from, to, amount);
+            await createSettlement(tripId, from, to, amount, allocations);
         } catch (err) {
             console.error("Erro ao registrar pagamento:", err);
             showError("Não foi possível registrar o pagamento.");
+        }
+    };
+
+    // "Marcar como pago" no modal de participantes da despesa: cobre a cota
+    // inteira daquela pessoa nessa despesa específica, sem recalcular a
+    // divisão (diferente de remover participante).
+    const handleMarkExpenseAsPaid = async (expenseId: string, uid: string, amount: number) => {
+        if (!tripId || !expenseToView) return;
+        try {
+            await createSettlement(tripId, uid, expenseToView.paidBy, amount, [{ expenseId, uid, amount }]);
+        } catch (err) {
+            console.error("Erro ao marcar despesa como paga:", err);
+            showError("Não foi possível marcar como pago.");
         }
     };
 
@@ -508,8 +521,10 @@ export default function TripDetails() {
                     trip={trip}
                     profiles={profiles}
                     expense={expenseToView}
+                    settlements={settlements}
                     canEdit={canEdit}
                     onRemoveParticipant={(uid) => handleRemoveExpenseParticipant(expenseToView!.id, uid)}
+                    onMarkAsPaid={(uid, amount) => handleMarkExpenseAsPaid(expenseToView!.id, uid, amount)}
                 />
             )}
 

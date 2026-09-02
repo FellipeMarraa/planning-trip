@@ -4,10 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { MoneyInput } from "@/components/common/money-input";
 import { getMemberName } from "@/lib/members";
-import { useAuth } from "@/context/AuthContext";
 import { Scale, Trash2 } from "lucide-react";
-import { computeEqualShare } from "@/hooks/useTripBalances";
-import type { Expense, Settlement, Trip, UserProfile } from '@/types';
+import { getExpenseRemaining, allocatePayment } from "@/lib/settlementAllocation";
+import type { Expense, Settlement, SettlementAllocation, Trip, UserProfile } from '@/types';
 
 interface MemberDebtModalProps {
     open: boolean;
@@ -17,7 +16,7 @@ interface MemberDebtModalProps {
     memberUid: string | null;
     expenses: Expense[];
     settlements: Settlement[];
-    onSettle: (from: string, to: string, amount: number) => void;
+    onSettle: (from: string, to: string, amount: number, allocations: SettlementAllocation[]) => void;
     onDeleteSettlement: (settlementId: string) => void;
     canEdit: boolean;
 }
@@ -26,6 +25,7 @@ interface DebtItem {
     expenseId: string;
     description: string;
     share: number;
+    date: string;
 }
 
 interface DebtGroup {
@@ -38,7 +38,6 @@ const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid, expenses, settlements, onSettle, onDeleteSettlement, canEdit }: MemberDebtModalProps) {
-    const { user } = useAuth();
     const [settlingKey, setSettlingKey] = useState<string | null>(null);
     const [settleAmount, setSettleAmount] = useState(0);
 
@@ -47,9 +46,18 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
         setSettleAmount(maxAmount);
     };
 
-    const confirmSettle = (from: string, to: string, maxAmount: number) => {
-        const amount = Math.min(Math.max(settleAmount, 0.01), maxAmount);
-        onSettle(from, to, amount);
+    // Pagamento livre: se o valor não bater exato com nenhuma cota, abate
+    // automaticamente da despesa mais antiga com saldo (allocatePayment) —
+    // decisão confirmada com o usuário. `uid` da alocação é sempre quem deve
+    // (`from`), independente de ser a seção "deve para" ou "recebe de".
+    const confirmSettle = (from: string, to: string, group: DebtGroup) => {
+        const amount = Math.min(Math.max(settleAmount, 0.01), group.total);
+        const allocations = allocatePayment(
+            amount,
+            from,
+            group.items.map((item) => ({ expenseId: item.expenseId, remaining: item.share, date: item.date }))
+        );
+        onSettle(from, to, amount, allocations);
         setSettlingKey(null);
     };
 
@@ -64,28 +72,37 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
         const owed: Record<string, DebtGroup> = {};
         const owedToMe: Record<string, DebtGroup> = {};
 
+        // Usa getExpenseRemaining (já desconta qualquer acerto, total ou
+        // parcial, já registrado pra essa cota específica) em vez da cota
+        // bruta — item some da lista assim que a cota dele for coberta.
         expenses.forEach((exp) => {
             const participants = exp.participants || [];
             if (!participants.includes(memberUid)) return;
-            const share = computeEqualShare(exp.amountBRL, participants.length);
-            const item = { expenseId: exp.id, description: exp.description, share };
 
             if (exp.paidBy === memberUid) {
                 participants.forEach((uid) => {
                     if (uid === memberUid) return;
+                    const remaining = getExpenseRemaining(exp, uid, settlements);
+                    if (remaining <= 0.01) return;
                     if (!owedToMe[uid]) owedToMe[uid] = { uid, total: 0, items: [] };
-                    owedToMe[uid].total += share;
-                    owedToMe[uid].items.push(item);
+                    owedToMe[uid].total += remaining;
+                    owedToMe[uid].items.push({ expenseId: exp.id, description: exp.description, share: remaining, date: exp.date });
                 });
             } else {
+                const remaining = getExpenseRemaining(exp, memberUid, settlements);
+                if (remaining <= 0.01) return;
                 const payer = exp.paidBy;
                 if (!owed[payer]) owed[payer] = { uid: payer, total: 0, items: [] };
-                owed[payer].total += share;
-                owed[payer].items.push(item);
+                owed[payer].total += remaining;
+                owed[payer].items.push({ expenseId: exp.id, description: exp.description, share: remaining, date: exp.date });
             }
         });
 
+        // Acertos "livres" sem allocations (dado anterior a essa feature, ou
+        // caso raro sem vínculo) continuam abatendo do total direto — os com
+        // allocations já foram refletidos item a item acima, via getExpenseRemaining.
         settlements.forEach((s) => {
+            if (s.allocations && s.allocations.length > 0) return;
             if (s.from === memberUid && owed[s.to]) owed[s.to].total -= s.amount;
             if (s.to === memberUid && owedToMe[s.from]) owedToMe[s.from].total -= s.amount;
         });
@@ -125,7 +142,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                 <p className="text-sm text-foreground">{getMemberName(group.uid, trip, profiles)}</p>
                                                 <p className="text-sm font-semibold text-destructive tabular-nums">{formatBRL(group.total)}</p>
                                             </div>
-                                            {canEdit && user?.uid === group.uid && (
+                                            {canEdit && (
                                                 settlingKey === `debt-${group.uid}` ? null : (
                                                     <Button size="sm" variant="outline" onClick={() => startSettle(`debt-${group.uid}`, group.total)}>
                                                         Registrar pagamento
@@ -133,7 +150,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                 )
                                             )}
                                         </div>
-                                        {canEdit && user?.uid === group.uid && settlingKey === `debt-${group.uid}` && (
+                                        {canEdit && settlingKey === `debt-${group.uid}` && (
                                             <div className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border">
                                                 <MoneyInput
                                                     value={settleAmount}
@@ -141,7 +158,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                     prefix="R$"
                                                     className="h-9 text-sm"
                                                 />
-                                                <Button size="sm" className="h-9 flex-shrink-0" onClick={() => confirmSettle(memberUid, group.uid, group.total)}>
+                                                <Button size="sm" className="h-9 flex-shrink-0" onClick={() => confirmSettle(memberUid, group.uid, group)}>
                                                     Confirmar
                                                 </Button>
                                                 <Button size="sm" variant="ghost" className="h-9 flex-shrink-0" onClick={() => setSettlingKey(null)}>
@@ -176,7 +193,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                 <p className="text-sm text-foreground">{getMemberName(group.uid, trip, profiles)}</p>
                                                 <p className="text-sm font-semibold text-chart-2 tabular-nums">{formatBRL(group.total)}</p>
                                             </div>
-                                            {canEdit && user?.uid === memberUid && (
+                                            {canEdit && (
                                                 settlingKey === `credit-${group.uid}` ? null : (
                                                     <Button size="sm" variant="outline" onClick={() => startSettle(`credit-${group.uid}`, group.total)}>
                                                         Registrar pagamento
@@ -184,7 +201,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                 )
                                             )}
                                         </div>
-                                        {canEdit && user?.uid === memberUid && settlingKey === `credit-${group.uid}` && (
+                                        {canEdit && settlingKey === `credit-${group.uid}` && (
                                             <div className="flex items-center gap-2 p-2 rounded-lg bg-background border border-border">
                                                 <MoneyInput
                                                     value={settleAmount}
@@ -192,7 +209,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
                                                     prefix="R$"
                                                     className="h-9 text-sm"
                                                 />
-                                                <Button size="sm" className="h-9 flex-shrink-0" onClick={() => confirmSettle(group.uid, memberUid, group.total)}>
+                                                <Button size="sm" className="h-9 flex-shrink-0" onClick={() => confirmSettle(group.uid, memberUid, group)}>
                                                     Confirmar
                                                 </Button>
                                                 <Button size="sm" variant="ghost" className="h-9 flex-shrink-0" onClick={() => setSettlingKey(null)}>

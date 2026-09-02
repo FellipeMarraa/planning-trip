@@ -44,6 +44,16 @@ export interface Expense {
     baseRateAtTime?: number;
 }
 
+// A quais cotas específicas (despesa + participante) um acerto se refere —
+// metadado de exibição só, nunca usado no cálculo do saldo total
+// (computeTripBalances/firestore.rules continuam usando só Settlement.amount,
+// cru). A soma dos `amount` aqui sempre bate com o `amount` do Settlement.
+export interface SettlementAllocation {
+    expenseId: string;
+    uid: string;
+    amount: number;
+}
+
 export interface Settlement {
     id: string;
     tripId: string;
@@ -51,6 +61,7 @@ export interface Settlement {
     to: string;   // uid de quem recebeu
     amount: number; // em BRL
     createdAt: number;
+    allocations?: SettlementAllocation[]; // ausente = acerto "livre" (dado anterior a essa feature, ou sem cota específica)
 }
 
 export interface Activity {
