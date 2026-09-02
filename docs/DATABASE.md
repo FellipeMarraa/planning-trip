@@ -70,6 +70,8 @@ interface SettlementAllocation { expenseId: string; uid: string; amount: number;
 
 Quem pode registrar: qualquer `OWNER`/`EDITOR` da viagem, entre **quaisquer** dois participantes (não precisa ser uma das partes envolvidas) — é o que permite um editor "marcar como pago" a dívida de outra pessoa. `VIEWER` nunca cria acerto nenhum.
 
+**Desfazer** ("marcar como pago" por engano, `undoExpensePayment` em `services/settlements.ts`): se o acerto foi criado só pra essa cota (`allocations` com 1 item — sempre o caso do botão "marcar como pago"), apaga o documento inteiro. Se o acerto também cobre outras despesas (pagamento livre auto-alocado em várias, ver `allocatePayment` em `lib/settlementAllocation.ts`), remove só a alocação em questão e subtrai o valor correspondente do `amount` — nunca apaga o acerto inteiro nesse caso, senão desfaria o pagamento de itens não relacionados.
+
 ### 2.4 `Activity`
 
 ```ts

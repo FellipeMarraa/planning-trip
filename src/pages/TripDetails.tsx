@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember, transferOwnership } from '@/services/trips';
 import { createInvite } from '@/services/invites';
 import { deleteExpense, removeExpenseParticipant } from '@/services/expenses';
-import { createSettlement, deleteSettlement } from '@/services/settlements';
+import { createSettlement, deleteSettlement, undoExpensePayment } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/common/stat-card";
 import { TripMembers } from "@/components/trip/TripMembers";
@@ -349,6 +349,17 @@ export default function TripDetails() {
         }
     };
 
+    // Desfaz "marcar como pago" (clique errado) — apaga ou reduz o(s) acerto(s)
+    // que cobriam essa cota, sem mexer em nenhum outro item pago.
+    const handleUndoExpensePayment = async (expenseId: string, uid: string) => {
+        try {
+            await undoExpensePayment(expenseId, uid, settlements);
+        } catch (err) {
+            console.error("Erro ao desfazer pagamento:", err);
+            showError("Não foi possível desfazer o pagamento.");
+        }
+    };
+
     const handleDeleteSettlement = async (settlementId: string) => {
         try {
             await deleteSettlement(settlementId);
@@ -538,6 +549,7 @@ export default function TripDetails() {
                     canEdit={canEdit}
                     onRemoveParticipant={(uid) => handleRemoveExpenseParticipant(expenseToView!.id, uid)}
                     onMarkAsPaid={(uid, amount) => handleMarkExpenseAsPaid(expenseToView!.id, uid, amount)}
+                    onUndoPayment={(uid) => handleUndoExpensePayment(expenseToView!.id, uid)}
                 />
             )}
 

@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { getMemberName } from "@/lib/members";
-import { CheckCircle2, UserX, Users } from "lucide-react";
+import { CheckCircle2, RotateCcw, UserX, Users } from "lucide-react";
 import { computeEqualShare } from "@/hooks/useTripBalances";
 import { getExpenseRemaining } from "@/lib/settlementAllocation";
 import type { Expense, Settlement, Trip, UserProfile } from '@/types';
@@ -17,12 +17,13 @@ interface ExpenseParticipantsModalProps {
     canEdit: boolean;
     onRemoveParticipant: (uid: string) => void;
     onMarkAsPaid: (uid: string, amount: number) => void;
+    onUndoPayment: (uid: string) => void;
 }
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, expense, settlements, canEdit, onRemoveParticipant, onMarkAsPaid }: ExpenseParticipantsModalProps) {
+export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, expense, settlements, canEdit, onRemoveParticipant, onMarkAsPaid, onUndoPayment }: ExpenseParticipantsModalProps) {
     if (!expense) return null;
 
     const participants = expense.participants || [];
@@ -86,6 +87,17 @@ export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, e
                                                 aria-label={`Marcar ${getMemberName(uid, trip, profiles)} como pago nesta despesa`}
                                             >
                                                 <CheckCircle2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        {canEdit && !isPayer && isPaid && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onUndoPayment(uid)}
+                                                className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                                aria-label={`Desfazer pagamento de ${getMemberName(uid, trip, profiles)} nesta despesa`}
+                                                title="Desfazer pagamento"
+                                            >
+                                                <RotateCcw className="w-4 h-4" />
                                             </button>
                                         )}
                                         {canRemove(uid) && (
