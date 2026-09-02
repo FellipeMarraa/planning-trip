@@ -10,7 +10,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarDays, ChevronLeft, CheckCircle2, Circle, Clock, MapPin, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/empty-state";
-import { deleteActivity, toggleActivityComplete } from '@/services/activities';
+import { deleteActivity, deleteAllActivities, toggleActivityComplete } from '@/services/activities';
 import AddActivityDialog from '@/components/trip/AddActivityDialog';
 import {
     AlertDialog,
@@ -38,6 +38,7 @@ export default function TripItineraryPage() {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
     const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
+    const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
     const tripDays = useMemo(() => {
         if (!trip?.startDate || !trip?.endDate) return [];
@@ -78,6 +79,16 @@ export default function TripItineraryPage() {
         }
     };
 
+    const handleDeleteAllConfirm = async () => {
+        if (!tripId) return;
+        try {
+            await deleteAllActivities(tripId);
+        } catch (err) {
+            console.error("Erro ao excluir roteiro:", err);
+            showError("Não foi possível excluir o roteiro.");
+        }
+    };
+
     if (tripLoading) return (
         <div className="min-h-screen bg-background flex items-center justify-center">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -99,7 +110,17 @@ export default function TripItineraryPage() {
                         <h1 className="text-sm font-semibold text-foreground">{trip?.name}</h1>
                         <p className="text-xs text-primary font-medium mt-0.5">Roteiro da viagem</p>
                     </div>
-                    <div className="w-9" />
+                    {canEdit && activities.length > 0 ? (
+                        <button
+                            onClick={() => setIsDeleteAllOpen(true)}
+                            className="w-9 h-9 flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                            aria-label="Excluir roteiro inteiro"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <div className="w-9" />
+                    )}
                 </div>
 
                 <div className="max-w-3xl mx-auto px-6 pt-4 overflow-x-auto scrollbar-none">
@@ -249,6 +270,32 @@ export default function TripItineraryPage() {
                             className="flex-1 h-9 rounded-lg"
                         >
                             Remover
+                        </AlertDialogAction>
+                    </div>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+                <AlertDialogContent className="max-w-[320px] rounded-3xl p-6">
+                    <AlertDialogHeader className="space-y-2">
+                        <AlertDialogTitle className="text-sm font-medium text-foreground text-center">
+                            Excluir o roteiro inteiro?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-center">
+                            Remove todas as atividades de todos os dias desta viagem. Essa ação é permanente e não pode ser desfeita.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="flex gap-3 mt-6">
+                        <AlertDialogCancel className="flex-1 h-9 rounded-lg">
+                            Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            variant="destructive"
+                            onClick={handleDeleteAllConfirm}
+                            className="flex-1 h-9 rounded-lg"
+                        >
+                            Excluir tudo
                         </AlertDialogAction>
                     </div>
                 </AlertDialogContent>

@@ -1,6 +1,17 @@
 // src/services/activities.ts
 import { db } from '@/config/firebase';
-import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+
+// Mesmo limite/motivo de trips.ts (Firestore trava writeBatch em 500 operações).
+const BATCH_LIMIT = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
+}
 
 interface CreateActivityInput {
     tripId: string;
@@ -24,4 +35,18 @@ export async function toggleActivityComplete(activityId: string, currentStatus: 
 
 export async function deleteActivity(activityId: string) {
     await deleteDoc(doc(db, 'activities', activityId));
+}
+
+// Apaga o roteiro inteiro da viagem de uma vez — todas as atividades de
+// todos os dias, não só o dia atual. Diferente de deleteActivity (item a
+// item, já existia); em lotes de 500 (limite físico do Firestore por batch).
+export async function deleteAllActivities(tripId: string) {
+    const snap = await getDocs(query(collection(db, 'activities'), where('tripId', '==', tripId)));
+    const refs = snap.docs.map((d) => d.ref);
+
+    for (const batchRefs of chunk(refs, BATCH_LIMIT)) {
+        const batch = writeBatch(db);
+        batchRefs.forEach((ref) => batch.delete(ref));
+        await batch.commit();
+    }
 }
