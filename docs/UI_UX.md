@@ -22,6 +22,10 @@ Contagem real de uso no código (`grep` em `src/`): `sm:` em 22 lugares/12 arqui
 
 Não há sidebar — `Layout.tsx` é um único header fixo no topo com logo/link pra `/`, ícone de admin condicional (`isGlobalAdmin`), avatar/nome/e-mail do usuário e botão de logout. A página de itinerário (`/trip/:tripId/itinerary`) não usa `Layout` — tem visual próprio, imersivo, dark mode fixo.
 
+### 4.1 Safe area (PWA instalado) — não confiar só no padding do `Layout.tsx`
+
+`index.html` já tem `viewport-fit=cover`, e `Layout.tsx` cobre a maioria das telas com `pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]` no container raiz. **Isso não cobre elementos `fixed`** (escapam do fluxo/padding do pai) nem páginas que não usam `Layout` (a de itinerário) — cada um desses precisa da própria safe area, senão, num PWA instalado ("Adicionar à tela de início", sem chrome do navegador), o conteúdo do topo fica embaixo da barra de status (bateria/relógio/wifi) e o de baixo embaixo da gesture bar do iOS. Já corrigido em: `AiAssistantWidget.tsx` (painel `fixed inset-0` no mobile + botão flutuante) e `TripItineraryPage.tsx` (header/footer, por não usar `Layout`). Qualquer elemento novo `fixed` que toque a borda da tela, ou página nova fora de `Layout`, precisa do mesmo tratamento.
+
 ## 5. Reutilização de componentes — nunca duplicar
 
 Antes de criar um componente novo, checar `components/common/*` (primitivas: `empty-state`, `money-input`, `section-header`, `stat-card`) e `components/trip/*` (feature: diálogos, tabelas, modais já existentes) — o padrão de "estado vazio" (`empty-state.tsx`) e o de input monetário (`money-input.tsx`) já resolvidos ali devem ser reaproveitados, não reescritos dentro de uma feature nova.

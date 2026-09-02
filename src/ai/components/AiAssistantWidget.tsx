@@ -205,8 +205,13 @@ function WidgetPanel({ tripId, onClose }: { tripId?: string; onClose: () => void
     return (
         <div className={cn(
             "fixed z-50 flex flex-col bg-background border border-border shadow-2xl overflow-hidden",
-            "inset-0",
-            "sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[380px] sm:h-[600px] sm:max-h-[80vh] sm:rounded-2xl"
+            // Tela cheia no mobile é `fixed`, então escapa do padding de safe
+            // area do Layout.tsx (que só cobre o container normal, não fixed)
+            // — sem isso, num PWA instalado ("Adicionar à tela de início"),
+            // o header/botão de fechar ficava embaixo da barra de status
+            // (bateria/relógio/wifi), inacessível.
+            "inset-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+            "sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[380px] sm:h-[600px] sm:max-h-[80vh] sm:rounded-2xl sm:pt-0 sm:pb-0"
         )}>
             {view === 'list' ? (
                 <>
@@ -249,7 +254,7 @@ export function AiAssistantWidget() {
                 <Button
                     onClick={handleOpen}
                     size="icon"
-                    className="fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-lg"
+                    className="fixed right-6 z-40 h-14 w-14 rounded-full shadow-lg bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
                     aria-label="Assistente de viagem"
                 >
                     <Plane className="h-6 w-6 -rotate-45" />

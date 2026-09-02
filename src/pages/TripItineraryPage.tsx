@@ -87,7 +87,10 @@ export default function TripItineraryPage() {
     return (
         <div className="h-screen bg-background text-foreground font-sans overflow-hidden flex flex-col">
 
-            <header className="flex-shrink-0 bg-background border-b border-border pt-6">
+            {/* Página não usa Layout.tsx (imersiva, ver App.tsx isItinerary) —
+                sem o padding de safe area de lá, header/footer ficavam embaixo
+                da barra de status/gesture bar num PWA instalado. */}
+            <header className="flex-shrink-0 bg-background border-b border-border pt-[calc(1.5rem+env(safe-area-inset-top))]">
                 <div className="max-w-3xl mx-auto px-6 flex items-center justify-between mb-6">
                     <button onClick={() => navigate(`/trip/${tripId}`)} className="p-2 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors">
                         <ChevronLeft className="w-5 h-5" />
@@ -200,7 +203,7 @@ export default function TripItineraryPage() {
                 </AnimatePresence>
             </main>
 
-            <footer className="flex-shrink-0 p-6 max-w-xl mx-auto w-full grid grid-cols-2 gap-4">
+            <footer className="flex-shrink-0 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-w-xl mx-auto w-full grid grid-cols-2 gap-4">
                 <Button
                     variant="outline"
                     disabled={currentStep === 0}
