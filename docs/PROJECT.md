@@ -37,7 +37,7 @@ Tudo listado na tabela da seção 3. Não há push notification, não há export
 
 ## 6. Fora de escopo (não implementar sem decisão explícita)
 
-- **`/admin`**: rota existe (`App.tsx`, gated por `isGlobalAdmin`) mas é um placeholder estático sem funcionalidade — não expandir sem pedido explícito.
+- **`/admin`**: rota existe (`App.tsx`, gated por `isGlobalAdmin`), com funcionalidade real (visão geral + erros reportados, `src/pages/Admin.tsx` — ver [SECURITY.md](./SECURITY.md) seção 3) — mas escopo deliberadamente pequeno (nenhuma feature de pagamento/cupom/IA, que não existem neste app). Não expandir além de visibilidade/observabilidade sem pedido explícito.
 - Multi-moeda de referência real (hoje é BRL-cêntrico por baixo do capô).
 - Notificações, exportação de dados, múltiplos idiomas.
 - Integração de API externa (clima, voos, hotéis) no assistente de IA — hoje ele responde só com o próprio conhecimento do modelo, ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 9.

@@ -6,6 +6,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Admin GLOBAL do sistema (quem criou/mantém o app) — NÃO tem relação
+    // nenhuma com ser dono de uma viagem (trips/{id}.ownerId). Mesma lista
+    // hardcoded que src/context/AuthContext.tsx (GLOBAL_ADMIN_EMAILS) — sem
+    // backend próprio pra custom claim, então os dois têm que ser mantidos
+    // em sincronia manualmente se o e-mail do admin mudar.
+    function isGlobalAdmin() {
+      return isSignedIn() && request.auth.token.email == 'fellipemarra.fm@gmail.com';
+    }
+
     function tripData(tripId) {
       return get(/databases/$(database)/documents/trips/$(tripId)).data;
     }
@@ -39,7 +48,11 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      // isGlobalAdmin() além do participante: painel /admin precisa contar
+      // e listar viagens pra métricas — sem isso, getCountFromServer(trips)
+      // é negado por inteiro (query sem where não bate com a checagem por
+      // participante, mesma classe de bug documentada em SECURITY.md).
+      allow read: if isSignedIn() && (request.auth.uid in resource.data.participants || isGlobalAdmin());
 
       allow create: if isSignedIn()
         && isCashzPremium(request.auth.uid)
@@ -167,6 +180,17 @@ service cloud.firestore {
     match /ai_usage/{docId} {
       // Contador global de custo — nunca legível/gravável pelo client.
       allow read, write: if false;
+    }
+
+    match /client_logs/{logId} {
+      // Erro não tratado (render ou promise/window) reportado direto do
+      // client pro admin conseguir ver sem depender do usuário reportar
+      // manualmente (ver docs/LOGGING.md). Cada um só grava o próprio erro,
+      // autoatribuído — nunca em nome de outro uid, nunca lido/apagado por
+      // quem não seja o admin global.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isGlobalAdmin();
+      allow update: if false;
     }
 
     match /invites/{inviteId} {

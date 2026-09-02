@@ -15,6 +15,7 @@
 | `ai_threads` | auto | só `api/ai/chat.ts` (Admin SDK) | `src/ai/hooks/useAIChat.ts` (`onSnapshot`, só a própria) |
 | `ai_messages` | auto | só `api/ai/chat.ts` (Admin SDK) | `src/ai/hooks/useAIChat.ts` (`onSnapshot`, só a própria thread) |
 | `ai_usage` | fixo (`global`) | só `api/ai/_lib/usage.ts` (Admin SDK) | nunca — nem client nem regra permitem leitura |
+| `client_logs` | auto | `reportClientError` (`src/lib/reportClientError.ts`), qualquer usuário autenticado, autoatribuído | só admin global (`src/pages/Admin.tsx`) |
 
 Todas as coleções são **top-level, sem subcoleção** — `expenses`/`settlements`/`activities` denormalizam `tripId` e são filtradas com `where('tripId', '==', ...)`.
 

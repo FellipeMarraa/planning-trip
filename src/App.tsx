@@ -6,6 +6,7 @@ import { ToastProvider } from './context/ToastContext';
 import Layout from './components/layout/Layout';
 import PageLoader from './components/common/page-loader';
 import { CHUNK_RELOAD_FLAG, ErrorBoundary } from './components/common/error-boundary';
+import { GlobalErrorInterceptor } from './components/common/global-error-interceptor';
 
 // Lazy: cada rota carrega só o que precisa (evita baixar Recharts/Framer
 // Motion de outras páginas antes de mostrar, por exemplo, a de convite).
@@ -16,13 +17,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard.tsx'));
 const TripDetails = lazy(() => import('@/pages/TripDetails.tsx'));
 const JoinTrip = lazy(() => import('@/pages/JoinTrip.tsx'));
 const TripItineraryPage = lazy(() => import('@/pages/TripItineraryPage.tsx'));
-
-const GlobalAdminPlaceholder = () => (
-    <div className="space-y-2">
-        <h1 className="text-2xl font-semibold text-foreground">Painel de administração</h1>
-        <p className="text-muted-foreground text-sm">Área reservada para administradores globais.</p>
-    </div>
-);
+const Admin = lazy(() => import('@/pages/Admin.tsx'));
 
 const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode, roleRequired?: 'GLOBAL' }) => {
     const { user, loading, isGlobalAdmin } = useAuth();
@@ -72,6 +67,7 @@ export default function App() {
     return (
         <ToastProvider>
         <AuthProvider>
+            <GlobalErrorInterceptor>
             <Router>
                 <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
@@ -124,7 +120,7 @@ export default function App() {
                     {/* Rota Administrativa */}
                     <Route path="/admin" element={
                         <ProtectedRoute roleRequired="GLOBAL">
-                            <GlobalAdminPlaceholder />
+                            <Admin />
                         </ProtectedRoute>
                     } />
 
@@ -134,6 +130,7 @@ export default function App() {
                 </Suspense>
                 </ErrorBoundary>
             </Router>
+            </GlobalErrorInterceptor>
         </AuthProvider>
         </ToastProvider>
     );

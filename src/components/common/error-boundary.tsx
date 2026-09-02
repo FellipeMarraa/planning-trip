@@ -2,6 +2,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { reportClientError } from '@/lib/reportClientError';
 
 const CHUNK_LOAD_ERROR_PATTERN = /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i;
 
@@ -33,10 +34,18 @@ export class ErrorBoundary extends Component<Props, State> {
         // fechando e reabrindo o site (só um reload completo busca o
         // index.html novo, com os hashes certos). Recarrega automaticamente
         // UMA vez; a flag evita loop se o erro for outra coisa.
-        if (CHUNK_LOAD_ERROR_PATTERN.test(error.message) && !sessionStorage.getItem(CHUNK_RELOAD_FLAG)) {
-            sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
-            window.location.reload();
+        if (CHUNK_LOAD_ERROR_PATTERN.test(error.message)) {
+            if (!sessionStorage.getItem(CHUNK_RELOAD_FLAG)) {
+                sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
+                window.location.reload();
+            }
+            // Não reporta: é um efeito conhecido e autocorrigido de deploy,
+            // reportaria a mesma coisa toda vez que alguém tivesse uma aba
+            // aberta na hora de um deploy — ruído, não sinal.
+            return;
         }
+
+        reportClientError(`Render error: ${error.message}`, error.stack || info.componentStack || undefined);
     }
 
     render() {

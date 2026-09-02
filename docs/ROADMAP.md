@@ -17,12 +17,11 @@
 ## 3. Longo prazo (quando o volume de usuários justificar)
 
 1. Paginação real (`startAfter`) se algum `limit(1000)` (ver [PERFORMANCE.md](./PERFORMANCE.md) seção 3) começar a ser um teto real, não teórico.
-2. Log estruturado/remoto se um bug em produção precisar de investigação sem depender do usuário reportar (ver [LOGGING.md](./LOGGING.md) seção 4).
-3. Revisar `isGlobalAdmin` como custom claim/regra de Firestore, se `/admin` ganhar alguma ação real (ver [SECURITY.md](./SECURITY.md) seção 3).
+2. ~~Log estruturado/remoto~~ — **feito** (2026-09-02, motivado pelo app deixar de ser uso pessoal só do dono): `client_logs` (Firestore, gate por `isGlobalAdmin()` na regra) + `ErrorBoundary`/`GlobalErrorInterceptor` reportando erro de render e assíncrono. Ver [LOGGING.md](./LOGGING.md) seção 4.
+3. **Migrar admin de e-mail hardcoded pra campo `isAdmin`/custom claim** — `/admin` ganhou ação real (2026-09-02: `client_logs`, contagem de `trips`/`users`), o trigger que este item esperava. Ainda hardcoded (duplicado em `AuthContext.tsx` + `firestore.rules`) porque só existe 1 admin hoje — vira prioridade real no dia em que precisar de um segundo. Ver [SECURITY.md](./SECURITY.md) seção 3.
 
 ## 4. Fora de escopo até segunda ordem
 
-- Funcionalidade real em `/admin` (hoje é placeholder — ver [PROJECT.md](./PROJECT.md) seção 6).
 - Backend próprio do planning-trip além do endpoint SSO já existente no CashZ.
 - Suporte a múltiplas moedas de referência de fato (o app é BRL-cêntrico por baixo, mesmo com `Trip.baseCurrency`).
 - Modelo de branching mais pesado que o descrito em [GIT.md](./GIT.md).
