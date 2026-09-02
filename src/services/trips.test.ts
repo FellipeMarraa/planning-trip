@@ -39,7 +39,7 @@ vi.mock('firebase/firestore', () => ({
     serverTimestamp: vi.fn(),
 }));
 
-import { linkGhostToUser, leaveTripAsGhost } from './trips';
+import { linkGhostToUser, leaveTripAsGhost, joinTripByInvite } from './trips';
 
 function expenseDoc(id: string, data: Record<string, unknown>) {
     return { ref: { __ref: true, id }, data: () => data };
@@ -197,6 +197,37 @@ describe('leaveTripAsGhost', () => {
         await leaveTripAsGhost('trip1', 'user1', 'Fulano');
 
         expect(mockBatchUpdate).toHaveBeenCalled();
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+});
+
+describe('joinTripByInvite', () => {
+    it('adiciona o próprio uid como EDITOR (normaliza o role pra maiúsculo)', async () => {
+        await joinTripByInvite('trip1', 'editor', 'user1');
+
+        expect(mockUpdateDoc).toHaveBeenCalledWith(
+            expect.objectContaining({ collectionName: 'trips', id: 'trip1' }),
+            { participants: { __arrayUnion: 'user1' }, 'roles.user1': 'EDITOR' }
+        );
+    });
+
+    it('adiciona o próprio uid como VIEWER', async () => {
+        await joinTripByInvite('trip1', 'VIEWER', 'user1');
+
+        expect(mockUpdateDoc).toHaveBeenCalledWith(
+            expect.objectContaining({ collectionName: 'trips', id: 'trip1' }),
+            { participants: { __arrayUnion: 'user1' }, 'roles.user1': 'VIEWER' }
+        );
+    });
+
+    it('rejeita role que não seja editor/viewer (ex.: tentar entrar como OWNER) sem tocar o Firestore', async () => {
+        await expect(joinTripByInvite('trip1', 'owner', 'user1')).rejects.toThrow('Papel de convite inválido');
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    it('rejeita role vazio ou lixo', async () => {
+        await expect(joinTripByInvite('trip1', '', 'user1')).rejects.toThrow('Papel de convite inválido');
+        await expect(joinTripByInvite('trip1', 'hacker', 'user1')).rejects.toThrow('Papel de convite inválido');
         expect(mockUpdateDoc).not.toHaveBeenCalled();
     });
 });
