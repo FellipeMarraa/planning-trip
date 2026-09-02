@@ -1,6 +1,6 @@
 import React, {createContext, useContext, useEffect, useState} from 'react';
 import {auth, db} from '../config/firebase';
-import {doc, getDoc} from 'firebase/firestore';
+import {doc, onSnapshot} from 'firebase/firestore';
 import {
     GoogleAuthProvider,
     signInWithPopup,
@@ -41,21 +41,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { showError, showSuccess } = useToast();
 
     // Foto customizada (upload próprio, ver services/users.ts uploadAvatar) e
-    // `isAdmin` moram no mesmo doc — 1 leitura só. `isAdmin` nunca é gravável
-    // pelo client (fora da whitelist de campos da regra de update/create de
-    // users/{uid}, ver firestore.rules) — só setado manualmente no Firebase
-    // Console, já que este app não tem backend próprio pra automatizar isso.
-    // Diferente da versão anterior (lista de e-mail hardcoded no bundle),
-    // quem decide de verdade é a regra do Firestore (isGlobalAdmin() lá),
-    // isso aqui só reflete o mesmo campo pra UI mostrar/esconder o ícone.
-    const loadProfileExtras = async (uid: string) => {
-        try {
-            const snap = await getDoc(doc(db, 'users', uid));
-            setCustomPhotoURL(snap.data()?.photoBase64 || null);
-            setIsGlobalAdmin(snap.data()?.isAdmin === true);
-        } catch (error) {
-            console.error("Erro ao carregar dados do perfil:", error);
-        }
+    // `isAdmin` moram no mesmo doc — 1 listener só. `isAdmin` nunca é
+    // gravável pelo client (fora da whitelist de campos da regra de
+    // update/create de users/{uid}, ver firestore.rules) — só setado
+    // manualmente no Firebase Console. `isGlobalAdmin` aqui só espelha o
+    // campo pra UI mostrar/esconder o ícone; quem decide de verdade é a
+    // regra do Firestore (isGlobalAdmin() lá).
+    //
+    // `onSnapshot` (não `getDoc` único) é proposital: uma falha transitória
+    // de rede na primeira leitura deixava a foto do header sumida até o
+    // próximo refreshUser() — diferente da lista de membros (useUserProfiles,
+    // já usa onSnapshot), que se autorrecupera. Resolve a Promise no PRIMEIRO
+    // snapshot só pra não liberar a UI (loading=false) antes de saber se o
+    // usuário é admin — ProtectedRoute checaria isGlobalAdmin cedo demais.
+    const subscribeToProfile = (uid: string): Promise<() => void> => {
+        return new Promise((resolve) => {
+            let resolved = false;
+            const settle = (unsubscribe: () => void) => {
+                if (resolved) return;
+                resolved = true;
+                resolve(unsubscribe);
+            };
+            const unsubscribe = onSnapshot(
+                doc(db, 'users', uid),
+                (snap) => {
+                    setCustomPhotoURL(snap.data()?.photoBase64 || null);
+                    setIsGlobalAdmin(snap.data()?.isAdmin === true);
+                    settle(unsubscribe);
+                },
+                (error) => {
+                    console.error("Erro ao observar dados do perfil:", error);
+                    settle(unsubscribe);
+                }
+            );
+        });
     };
 
     const loginWithGoogle = async () => {
@@ -143,7 +162,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // `updateProfile`/`updateEmail` mutam auth.currentUser sem disparar
     // onAuthStateChanged — sem isso, o resto do app (ex.: nome no header do
     // Layout) só veria a mudança no próximo login. `reload()` + novo objeto
-    // no state força o re-render em quem lê `user` do contexto.
+    // no state força o re-render em quem lê `user` do contexto. Não precisa
+    // mais recarregar foto/isAdmin aqui — o listener de subscribeToProfile já
+    // mantém isso ao vivo (inclusive reflete o upload antes mesmo disso rodar).
     const refreshUser = async () => {
         if (!auth.currentUser) return;
         await auth.currentUser.reload();
@@ -151,18 +172,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // funcionando) só pra dar uma referência nova ao React — reload()
         // muta auth.currentUser no lugar, sem isso o state não re-renderiza.
         setUser(Object.assign(Object.create(Object.getPrototypeOf(auth.currentUser)), auth.currentUser));
-        await loadProfileExtras(auth.currentUser.uid);
     };
 
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+        let profileUnsubscribe: (() => void) | null = null;
+
+        const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
+            // Troca de conta/logout: encerra o listener do perfil anterior
+            // antes de abrir outro (ou nenhum).
+            profileUnsubscribe?.();
+            profileUnsubscribe = null;
+
             setUser(user);
             if (user) {
                 upsertUserProfile(user).catch((error) => console.error("Erro ao salvar perfil:", error));
-                // Aguarda antes de liberar a UI (loading=false) — sem isso,
-                // ProtectedRoute checaria isGlobalAdmin antes do getDoc
-                // resolver e mandaria embora quem é admin de verdade.
-                await loadProfileExtras(user.uid);
+                // Aguarda o primeiro snapshot antes de liberar a UI
+                // (loading=false) — sem isso, ProtectedRoute checaria
+                // isGlobalAdmin antes de saber o valor real e mandaria
+                // embora quem é admin de verdade.
+                profileUnsubscribe = await subscribeToProfile(user.uid);
                 // Sincroniza plano em paralelo, sem bloquear o carregamento —
                 // cobre quem loga direto (sem passar pelo SSO do CashZ).
                 syncPlanFromCashz(user);
@@ -172,7 +200,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             setLoading(false);
         });
-        return unsubscribe;
+
+        return () => {
+            unsubscribeAuth();
+            profileUnsubscribe?.();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
