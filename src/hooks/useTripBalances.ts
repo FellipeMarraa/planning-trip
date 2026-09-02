@@ -2,6 +2,15 @@
 import { useMemo } from 'react';
 import type { Expense, Settlement } from '@/types';
 
+// Divisão igual entre os participantes de uma despesa. Única fonte de
+// verdade da fórmula — antes estava duplicada (mesma linha, três arquivos:
+// aqui, ExpenseParticipantsModal.tsx e MemberDebtModal.tsx), risco real de
+// divergir silenciosamente se um dia a regra de divisão mudar (ex.: split
+// desigual) e alguém esquecer de atualizar uma das cópias.
+export function computeEqualShare(amountBRL: number, participantCount: number): number {
+    return (Number(amountBRL) || 0) / (participantCount || 1);
+}
+
 // Extraído do useMemo como função pura exportada só pra ser testável sem
 // infra de teste de hook (jsdom/@testing-library/react) — mesmo padrão do
 // CashZ (ver src/lib/goalAnalysis.ts de lá): testa a função, não o hook.
@@ -11,9 +20,8 @@ export function computeTripBalances(participants: string[], expenses: Expense[],
     participants.forEach((uid) => { balances[uid] = 0; });
 
     expenses.forEach((exp) => {
-        const amount = Number(exp.amountBRL) || 0;
         const splitWith = exp.participants || [];
-        const share = amount / (splitWith.length || 1);
+        const share = computeEqualShare(exp.amountBRL, splitWith.length);
 
         splitWith.forEach((uid) => {
             if (uid === exp.paidBy) return;

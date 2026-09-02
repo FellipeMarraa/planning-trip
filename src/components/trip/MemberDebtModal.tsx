@@ -6,6 +6,7 @@ import { MoneyInput } from "@/components/common/money-input";
 import { getMemberName } from "@/lib/members";
 import { useAuth } from "@/context/AuthContext";
 import { Scale, Trash2 } from "lucide-react";
+import { computeEqualShare } from "@/hooks/useTripBalances";
 import type { Expense, Settlement, Trip, UserProfile } from '@/types';
 
 interface MemberDebtModalProps {
@@ -66,7 +67,7 @@ export function MemberDebtModal({ open, onOpenChange, trip, profiles, memberUid,
         expenses.forEach((exp) => {
             const participants = exp.participants || [];
             if (!participants.includes(memberUid)) return;
-            const share = (Number(exp.amountBRL) || 0) / (participants.length || 1);
+            const share = computeEqualShare(exp.amountBRL, participants.length);
             const item = { expenseId: exp.id, description: exp.description, share };
 
             if (exp.paidBy === memberUid) {

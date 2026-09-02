@@ -313,6 +313,48 @@ describe('firestore.rules — expenses (canEdit)', () => {
             })
         );
     });
+
+    it('não cria despesa com amountBRL zero ou negativo', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 0,
+                paidBy: 'editor-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+            })
+        );
+    });
+
+    it('não cria despesa sem nenhum participante', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+                paidBy: 'editor-1', participants: [], date: '2027-06-02',
+            })
+        );
+    });
+
+    it('não cria despesa com paidBy de alguém que não é participante da viagem', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+                paidBy: 'stranger-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+            })
+        );
+    });
 });
 
 describe('firestore.rules — settlements create exige to == request.auth.uid', () => {
@@ -336,6 +378,42 @@ describe('firestore.rules — settlements create exige to == request.auth.uid', 
         await assertFails(
             addDoc(collection(asUser('editor-1'), 'settlements'), {
                 tripId: 'trip-1', from: 'editor-1', to: 'owner-1', amount: 50,
+            })
+        );
+    });
+
+    it('não cria acerto com valor zero ou negativo', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'settlements'), {
+                tripId: 'trip-1', from: 'owner-1', to: 'editor-1', amount: 0,
+            })
+        );
+    });
+
+    it('não cria acerto de alguém pagando pra si mesmo (from == to)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'settlements'), {
+                tripId: 'trip-1', from: 'editor-1', to: 'editor-1', amount: 50,
+            })
+        );
+    });
+
+    it('não cria acerto de alguém (from) que não é participante da viagem', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'settlements'), {
+                tripId: 'trip-1', from: 'stranger-1', to: 'editor-1', amount: 50,
             })
         );
     });

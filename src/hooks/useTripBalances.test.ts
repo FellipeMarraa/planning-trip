@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { computeTripBalances } from './useTripBalances';
+import { computeTripBalances, computeEqualShare } from './useTripBalances';
 import type { Expense, Settlement } from '@/types';
+
+describe('computeEqualShare', () => {
+    it('divide igualmente entre os participantes', () => {
+        expect(computeEqualShare(100, 4)).toBe(25);
+    });
+
+    it('não divide por zero (trata como 1 participante)', () => {
+        expect(computeEqualShare(100, 0)).toBe(100);
+    });
+
+    it('trata amountBRL inválido/ausente como 0', () => {
+        expect(computeEqualShare(NaN, 2)).toBe(0);
+        // @ts-expect-error valor undefined vindo de dado real malformado
+        expect(computeEqualShare(undefined, 2)).toBe(0);
+    });
+});
 
 function expense(overrides: Partial<Expense> = {}): Expense {
     return {

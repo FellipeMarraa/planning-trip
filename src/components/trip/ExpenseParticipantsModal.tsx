@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { getMemberName } from "@/lib/members";
 import { UserX, Users } from "lucide-react";
+import { computeEqualShare } from "@/hooks/useTripBalances";
 import type { Expense, Trip, UserProfile } from '@/types';
 
 interface ExpenseParticipantsModalProps {
@@ -22,7 +23,7 @@ export function ExpenseParticipantsModal({ open, onOpenChange, trip, profiles, e
     if (!expense) return null;
 
     const participants = expense.participants || [];
-    const share = expense.amountBRL / (participants.length || 1);
+    const share = computeEqualShare(expense.amountBRL, participants.length);
     // Quem pagou não pode ser removido por aqui — mudar o pagador é uma
     // decisão diferente, feita editando a despesa inteira.
     const canRemove = (uid: string) => canEdit && participants.length > 1 && uid !== expense.paidBy;

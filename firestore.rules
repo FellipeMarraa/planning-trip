@@ -110,7 +110,17 @@ service cloud.firestore {
 
     match /expenses/{expenseId} {
       allow read: if isParticipant(resource.data.tripId);
-      allow create: if canEdit(request.resource.data.tripId);
+      // Antes só checava permissão, não o conteúdo — uma escrita direta (bug
+      // futuro num componente, ou devtools) conseguia gravar amountBRL
+      // negativo/zero ou participants vazio, corrompendo o saldo calculado
+      // (computeTripBalances) pra viagem inteira, silenciosamente. paidBy
+      // não precisa estar em `participants` (pagar por alguém sem dividir é
+      // um caso real de uso, ver AddExpenseDialog.tsx), só precisa ser
+      // alguém da viagem.
+      allow create: if canEdit(request.resource.data.tripId)
+        && request.resource.data.amountBRL is number && request.resource.data.amountBRL > 0
+        && request.resource.data.participants is list && request.resource.data.participants.size() > 0
+        && request.resource.data.paidBy in tripData(request.resource.data.tripId).participants;
       allow delete: if canEdit(resource.data.tripId);
       allow update: if canEdit(resource.data.tripId) || (
         // Sair da viagem: o próprio participante troca seu uid por um fantasma
@@ -149,7 +159,15 @@ service cloud.firestore {
 
     match /settlements/{settlementId} {
       allow read: if isParticipant(resource.data.tripId);
-      allow create: if canEdit(request.resource.data.tripId) && request.resource.data.to == request.auth.uid;
+      // Mesmo raciocínio de expenses: `to == request.auth.uid` já garante que
+      // quem recebe é participante (canEdit exige role), mas nada validava
+      // `amount`/`from` antes — um acerto de valor negativo/zero, ou de
+      // alguém que nem está na viagem, corrompia o saldo calculado.
+      allow create: if canEdit(request.resource.data.tripId)
+        && request.resource.data.to == request.auth.uid
+        && request.resource.data.amount is number && request.resource.data.amount > 0
+        && request.resource.data.from != request.resource.data.to
+        && request.resource.data.from in tripData(request.resource.data.tripId).participants;
       allow delete: if canEdit(resource.data.tripId);
       allow update: if canEdit(resource.data.tripId) || (
         // Sair da viagem: o próprio participante troca seu uid por um fantasma
