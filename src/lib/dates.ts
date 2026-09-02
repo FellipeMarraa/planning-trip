@@ -16,6 +16,7 @@ export interface TripCountdown {
     durationDays: number;
     status: TripCountdownStatus;
     daysUntilStart: number;
+    daysUntilEnd: number;
 }
 
 // parseISO (diferente de new Date()) interpreta 'yyyy-MM-dd' como meia-noite
@@ -31,5 +32,24 @@ export function getTripCountdown(startDate: string, endDate: string): TripCountd
 
     const status: TripCountdownStatus = daysUntilEnd < 0 ? 'finished' : daysUntilStart <= 0 ? 'ongoing' : 'upcoming';
 
-    return { durationDays, status, daysUntilStart };
+    return { durationDays, status, daysUntilStart, daysUntilEnd };
+}
+
+// Ordena pela "mais próxima" primeiro: em andamento (a que termina antes,
+// primeiro) > futura (a que começa antes, primeiro) > finalizada (a mais
+// recente primeiro). Usado em useUserTrips.ts — extraído aqui pra ficar perto
+// do resto da lógica de data/status da viagem, mesmo padrão de getTripCountdown.
+const STATUS_RANK: Record<TripCountdownStatus, number> = { ongoing: 0, upcoming: 1, finished: 2 };
+
+export function compareTripsByProximity(
+    a: { startDate: string; endDate: string },
+    b: { startDate: string; endDate: string }
+): number {
+    const ca = getTripCountdown(a.startDate, a.endDate);
+    const cb = getTripCountdown(b.startDate, b.endDate);
+
+    if (ca.status !== cb.status) return STATUS_RANK[ca.status] - STATUS_RANK[cb.status];
+    if (ca.status === 'finished') return cb.daysUntilEnd - ca.daysUntilEnd;
+    if (ca.status === 'ongoing') return ca.daysUntilEnd - cb.daysUntilEnd;
+    return ca.daysUntilStart - cb.daysUntilStart;
 }

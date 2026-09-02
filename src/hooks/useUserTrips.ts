@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../config/firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { compareTripsByProximity } from '../lib/dates';
 import type {Trip} from '@/types';
 
 export const useUserTrips = () => {
@@ -24,6 +25,10 @@ export const useUserTrips = () => {
                 id: doc.id,
                 ...doc.data()
             })) as Trip[];
+            // orderBy('createdAt') na query acima é só pra dar um resultado
+            // determinístico do Firestore — a ordem real de exibição (mais
+            // próxima primeiro) é recalculada aqui, client-side.
+            data.sort(compareTripsByProximity);
             setTrips(data);
             setLoading(false);
         }, (error) => {
