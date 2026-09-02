@@ -32,7 +32,12 @@ interface TripMembersProps {
 const MEMBERS_PER_PAGE = 4;
 
 export function TripMembers({ trip, profiles, canEdit, isOwner, onChangeRole, onRemoveMember, onAddGhost, onLinkGhost, onRenameGhost, onTransferOwnership }: TripMembersProps) {
-    const participants = trip.participants || [];
+    // Dono sempre primeiro; resto mantém a ordem original (sort é estável).
+    const participants = [...(trip.participants || [])].sort((a, b) => {
+        if (a === trip.ownerId) return -1;
+        if (b === trip.ownerId) return 1;
+        return 0;
+    });
     const [ghostName, setGhostName] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [editingGhostUid, setEditingGhostUid] = useState<string | null>(null);

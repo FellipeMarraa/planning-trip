@@ -22,7 +22,9 @@ const formatBRL = (value: number) =>
 const MEMBERS_PER_PAGE = 4;
 
 export function BalancesSummary({ trip, profiles, balances, currentUserUid, canViewAll, onSelectMember }: BalancesSummaryProps) {
-    const participants = trip.participants || [];
+    // Quem tem mais a receber primeiro, depois quem tem mais a pagar (saldo
+    // decrescente: positivo = a receber, negativo = a pagar).
+    const participants = [...(trip.participants || [])].sort((a, b) => (balances[b] || 0) - (balances[a] || 0));
     const [currentPage, setCurrentPage] = useState(1);
 
     const totalPages = Math.max(1, Math.ceil(participants.length / MEMBERS_PER_PAGE));
