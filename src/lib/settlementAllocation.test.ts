@@ -108,4 +108,13 @@ describe('allocatePayment', () => {
 
         expect(allocations).toEqual([{ expenseId: 'cafe', uid: 'bruno', amount: 20 }]);
     });
+
+    it('não quebra com despesa sem `date` (dado anterior ao campo existir)', () => {
+        const items = [
+            { expenseId: 'sanduiche', remaining: 50, date: '2027-01-10' },
+            { expenseId: 'cafe-antigo', remaining: 20, date: undefined as unknown as string },
+        ];
+
+        expect(() => allocatePayment(10, 'bruno', items)).not.toThrow();
+    });
 });

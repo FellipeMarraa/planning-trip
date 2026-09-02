@@ -120,7 +120,8 @@ service cloud.firestore {
       allow create: if canEdit(request.resource.data.tripId)
         && request.resource.data.amountBRL is number && request.resource.data.amountBRL > 0
         && request.resource.data.participants is list && request.resource.data.participants.size() > 0
-        && request.resource.data.paidBy in tripData(request.resource.data.tripId).participants;
+        && request.resource.data.paidBy in tripData(request.resource.data.tripId).participants
+        && request.resource.data.date is string && request.resource.data.date.size() > 0;
       allow delete: if canEdit(resource.data.tripId);
       allow update: if canEdit(resource.data.tripId) || (
         // Sair da viagem: o próprio participante troca seu uid por um fantasma

@@ -26,7 +26,10 @@ interface AllocatableItem {
 // segue pra próxima até o valor acabar; a última cota tocada pode ficar
 // parcialmente coberta.
 export function allocatePayment(amount: number, uid: string, items: AllocatableItem[]): SettlementAllocation[] {
-    const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
+    // Fallback defensivo: despesas antigas podem não ter `date` (era um campo
+    // do tipo nunca escrito até 2026-09-02 — ver docs/DATABASE.md) — sem o
+    // `|| ''`, `undefined.localeCompare` quebra em runtime.
+    const sorted = [...items].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     const allocations: SettlementAllocation[] = [];
     let remainingAmount = amount;
 

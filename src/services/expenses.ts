@@ -1,6 +1,6 @@
 // src/services/expenses.ts
 import { db } from '@/config/firebase';
-import { addDoc, arrayRemove, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, arrayRemove, collection, deleteDoc, deleteField, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 export interface ExpensePayload {
     tripId: string;
@@ -14,6 +14,12 @@ export interface ExpensePayload {
     amountBRL: number;
     paidBy: string;
     participants: string[];
+    date: string;
+    // Ausente (chave omitida, não `undefined` — o Firestore JS SDK rejeita
+    // campo com valor undefined) = sem comprovante (create) ou "não mexe no
+    // que já tinha" (update). `null` só faz sentido em update: remove o
+    // comprovante que já existia.
+    receiptBase64?: string | null;
 }
 
 export async function createExpense(payload: ExpensePayload) {
@@ -24,8 +30,10 @@ export async function createExpense(payload: ExpensePayload) {
 }
 
 export async function updateExpense(expenseId: string, payload: ExpensePayload) {
+    const { receiptBase64, ...rest } = payload;
     await updateDoc(doc(db, 'expenses', expenseId), {
-        ...payload,
+        ...rest,
+        ...(receiptBase64 === null ? { receiptBase64: deleteField() } : receiptBase64 !== undefined ? { receiptBase64 } : {}),
         updatedAt: serverTimestamp(),
     });
 }

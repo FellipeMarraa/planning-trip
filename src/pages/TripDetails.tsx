@@ -24,6 +24,7 @@ import { MemberDebtModal } from "@/components/trip/MemberDebtModal";
 import { ExpenseFilters } from "@/components/trip/ExpenseFilters";
 import { ExpenseTable, type ExpenseSortKey, type SortDirection } from "@/components/trip/ExpenseTable";
 import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsModal";
+import { ReceiptModal } from "@/components/trip/ReceiptModal";
 import {
     Calendar,
     LogOut,
@@ -72,6 +73,7 @@ export default function TripDetails() {
     // ao vivo de `expenses` — sem isso, remover um participante dentro do modal
     // não refletiria na hora, o modal ficaria mostrando o snapshot de quando foi aberto.
     const [expenseToViewId, setExpenseToViewId] = useState<string | null>(null);
+    const [receiptToViewId, setReceiptToViewId] = useState<string | null>(null);
     const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
     const [isLeaveTripOpen, setIsLeaveTripOpen] = useState(false);
     const [isEditTripOpen, setIsEditTripOpen] = useState(false);
@@ -105,6 +107,10 @@ export default function TripDetails() {
     const expenseToView = useMemo(
         () => expenses.find((expense) => expense.id === expenseToViewId) || null,
         [expenses, expenseToViewId]
+    );
+    const receiptToView = useMemo(
+        () => expenses.find((expense) => expense.id === receiptToViewId) || null,
+        [expenses, receiptToViewId]
     );
 
     // Visualizador só vê despesas em que participou; owner/editor vê tudo.
@@ -511,8 +517,15 @@ export default function TripDetails() {
                     onEdit={(expense) => { setExpenseToEdit(expense); setIsAddExpenseOpen(true); }}
                     onDelete={setExpenseToDelete}
                     onViewParticipants={(expense) => setExpenseToViewId(expense.id)}
+                    onViewReceipt={(expense) => setReceiptToViewId(expense.id)}
                 />
             )}
+
+            <ReceiptModal
+                open={!!receiptToViewId}
+                onOpenChange={() => setReceiptToViewId(null)}
+                expense={receiptToView}
+            />
 
             {trip && (
                 <ExpenseParticipantsModal

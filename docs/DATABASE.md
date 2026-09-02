@@ -49,10 +49,15 @@ interface Expense {
     amountOriginal: number; currency: string; amountBRL: number;
     paidBy: string; participants: string[]; date: string;
     spreadApplied?: number; exchangeRateUsed?: number; baseRateAtTime?: number;
+    receiptBase64?: string;
 }
 ```
 
 Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a taxa capturada (`exchangeRateUsed`/`baseRateAtTime`/`spreadApplied`) — mesmo que `Trip.baseCurrency` sugira outra moeda de referência, o app é BRL-cêntrico por baixo.
+
+`date` é `yyyy-MM-ddTHH:mm` (valor cru do `<input type="datetime-local">`, `AddExpenseDialog.tsx`) — **campo existia no tipo desde sempre mas nunca era escrito** até 2026-09-02 (sem input no formulário, sem uso em `ExpenseTable.tsx`); despesas criadas antes disso não têm esse campo. Todo código que lê `date` (`allocatePayment` em `settlementAllocation.ts`, `formatDateTimeBR` em `lib/dates.ts`) trata a ausência de forma defensiva, não assume presença.
+
+`receiptBase64` é o comprovante/recibo anexado (opcional) — mesmo padrão do avatar (`lib/image.ts` `resizeReceiptToBase64`, base64 direto no Firestore, sem Firebase Storage), mas sem crop quadrado (preserva proporção) e resolução maior (precisa dar pra ler o texto). Editável junto com o resto da despesa; removível (vira `deleteField()` em `services/expenses.ts` `updateExpense`, não fica um campo `null` esquecido no doc).
 
 ### 2.3 `Settlement`
 

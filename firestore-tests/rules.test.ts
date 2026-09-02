@@ -355,6 +355,20 @@ describe('firestore.rules — expenses (canEdit)', () => {
             })
         );
     });
+
+    it('não cria despesa sem data', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+                paidBy: 'editor-1', participants: ['owner-1', 'editor-1'], date: '',
+            })
+        );
+    });
 });
 
 describe('firestore.rules — settlements create (canEdit gerencia qualquer par de participantes)', () => {

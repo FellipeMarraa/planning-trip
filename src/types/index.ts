@@ -37,11 +37,12 @@ export interface Expense {
     amountBRL: number;
     paidBy: string;
     participants: string[]; // Uids (ou ghost_*) que dividem esta despesa
-    date: string;
+    date: string; // 'yyyy-MM-ddTHH:mm' (input datetime-local) — despesas anteriores a 2026-09-02 podem não ter esse campo, ver docs/DATABASE.md
 
     spreadApplied?: number;      // O % de taxa aplicado (ex: 1.6)
     exchangeRateUsed?: number;   // A taxa final com spread (ex: 5.91)
     baseRateAtTime?: number;
+    receiptBase64?: string;      // comprovante/recibo, mesmo padrão do avatar (base64 direto, sem Firebase Storage)
 }
 
 // A quais cotas específicas (despesa + participante) um acerto se refere —

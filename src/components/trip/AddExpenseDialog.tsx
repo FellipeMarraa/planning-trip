@@ -1,5 +1,6 @@
 // src/components/trip/AddExpenseDialog.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { format } from 'date-fns';
 import { createExpense, updateExpense } from '@/services/expenses';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,13 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/common/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, CreditCard, RotateCcw, Sparkles, Zap } from "lucide-react";
+import { Camera, Check, CreditCard, Loader2, RotateCcw, Sparkles, X, Zap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import { getMemberName } from "@/lib/members";
 import { cn } from "@/lib/utils";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currencies";
 import { EXPENSE_CATEGORIES } from "@/lib/categories";
+import { resizeReceiptToBase64 } from "@/lib/image";
 import type { Expense, Trip, UserProfile } from '@/types';
+
+const nowForInput = () => format(new Date(), "yyyy-MM-dd'T'HH:mm");
 
 interface AddExpenseDialogProps {
     open: boolean;
@@ -28,7 +33,10 @@ type CurrencyType = CurrencyCode;
 
 export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, rates: liveRates, expenseToEdit }: AddExpenseDialogProps) {
     const { user } = useAuth();
+    const { showError } = useToast();
     const [loading, setLoading] = useState(false);
+    const [processingReceipt, setProcessingReceipt] = useState(false);
+    const receiptInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
         description: '',
@@ -39,6 +47,9 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
         baseRate: 1, // cotação de compra, editável — congelada na despesa ao salvar
         paidBy: user?.uid || '',
         participants: trip.participants || [],
+        date: nowForInput(),
+        // null = sem comprovante (ou removido); string = base64 (novo ou o que já existia)
+        receiptBase64: null as string | null,
     });
 
     useEffect(() => {
@@ -58,6 +69,10 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 baseRate: isEditingBRL ? 1 : (expenseToEdit.baseRateAtTime || fallbackBaseRate),
                 paidBy: expenseToEdit.paidBy || user?.uid || '',
                 participants: expenseToEdit.participants?.length ? expenseToEdit.participants : (trip.participants || []),
+                // Despesa antiga sem `date` (campo só passou a ser gravado
+                // em 2026-09-02) cai no "agora" — usuário ajusta se lembrar.
+                date: expenseToEdit.date || nowForInput(),
+                receiptBase64: expenseToEdit.receiptBase64 || null,
             });
         } else {
             setFormData({
@@ -69,9 +84,28 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 baseRate: 1,
                 paidBy: user?.uid || '',
                 participants: trip.participants || [],
+                date: nowForInput(),
+                receiptBase64: null,
             });
         }
     }, [expenseToEdit, open]);
+
+    const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+
+        setProcessingReceipt(true);
+        try {
+            const base64 = await resizeReceiptToBase64(file);
+            setFormData((prev) => ({ ...prev, receiptBase64: base64 }));
+        } catch (error) {
+            console.error('Erro ao processar comprovante:', error);
+            showError(error instanceof Error ? error.message : 'Não foi possível processar a imagem.');
+        } finally {
+            setProcessingReceipt(false);
+        }
+    };
 
     const toggleParticipant = (uid: string) => {
         setFormData((prev) => ({
@@ -108,13 +142,20 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
             amountBRL: totalBRL,
             paidBy: formData.paidBy,
             participants: formData.participants,
+            date: formData.date,
         };
 
         try {
             if (expenseToEdit) {
-                await updateExpense(expenseToEdit.id, payload);
+                // Edição sempre manda o campo explícito (string novo/mantido,
+                // ou null pra remover) — updateExpense trata null como
+                // "apagar comprovante existente" (deleteField).
+                await updateExpense(expenseToEdit.id, { ...payload, receiptBase64: formData.receiptBase64 });
             } else {
-                await createExpense(payload);
+                await createExpense({
+                    ...payload,
+                    ...(formData.receiptBase64 ? { receiptBase64: formData.receiptBase64 } : {}),
+                });
             }
             onOpenChange(false);
         } catch (error) {
@@ -163,6 +204,17 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                     ))}
                                 </SelectContent>
                             </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Data e hora</Label>
+                            <Input
+                                type="datetime-local"
+                                className="h-10"
+                                value={formData.date}
+                                onChange={(e) => setFormData({...formData, date: e.target.value})}
+                                required
+                            />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -234,6 +286,49 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                     );
                                 })}
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Comprovante</Label>
+                            <input
+                                ref={receiptInputRef}
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={handleReceiptChange}
+                            />
+                            {formData.receiptBase64 ? (
+                                <div className="relative w-fit">
+                                    <img
+                                        src={formData.receiptBase64}
+                                        alt="Comprovante"
+                                        className="h-24 w-24 object-cover rounded-xl border border-border"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({...formData, receiptBase64: null})}
+                                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-sm"
+                                        aria-label="Remover comprovante"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={processingReceipt}
+                                    onClick={() => receiptInputRef.current?.click()}
+                                >
+                                    {processingReceipt ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Camera className="mr-2 h-4 w-4" />
+                                    )}
+                                    Anexar foto
+                                </Button>
+                            )}
                         </div>
 
                         {!isBRL && (

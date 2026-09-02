@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { getMemberName } from "@/lib/members";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Trash2, Users, Wallet } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Receipt, Trash2, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDateTimeBR } from "@/lib/dates";
 import type { Expense, Trip, UserProfile } from '@/types';
 
 export type ExpenseSortKey = 'description' | 'category' | 'amountOriginal' | 'amountBRL';
@@ -28,12 +29,13 @@ interface ExpenseTableProps {
     onEdit: (expense: Expense) => void;
     onDelete: (expense: Expense) => void;
     onViewParticipants: (expense: Expense) => void;
+    onViewReceipt: (expense: Expense) => void;
 }
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, isDomesticBRL, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants }: ExpenseTableProps) {
+export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, isDomesticBRL, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants, onViewReceipt }: ExpenseTableProps) {
     const SortableHeader = ({ column, label, align }: { column: ExpenseSortKey; label: string; align?: 'right' }) => (
         <th className={cn("px-6 py-3 font-medium", align === 'right' && "text-right")}>
             <button
@@ -80,7 +82,20 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                         expenses.map((expense) => (
                             <tr key={expense.id} className="hover:bg-muted/30 transition-colors">
                                 <td className="px-6 py-4">
-                                    <p className="text-sm font-medium text-foreground">{expense.description}</p>
+                                    <div className="flex items-center gap-1.5">
+                                        <p className="text-sm font-medium text-foreground">{expense.description}</p>
+                                        {expense.receiptBase64 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onViewReceipt(expense)}
+                                                className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                                                aria-label="Ver comprovante"
+                                            >
+                                                <Receipt className="h-3.5 w-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground tabular-nums">{formatDateTimeBR(expense.date)}</p>
                                     <p className="text-xs text-muted-foreground">
                                         {expense.currency === 'BRL' ? 'Sem conversão' : expense.spreadApplied ? `Spread: ${expense.spreadApplied}%` : 'Taxa não informada'}
                                     </p>
