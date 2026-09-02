@@ -8,6 +8,10 @@ export interface AIProviderResult {
     promptTokens: number;
     completionTokens: number;
     model: string;
+    // Nº de chamadas de ferramenta embutida (ex.: busca na web do Groq
+    // Compound) — cobradas à parte do token, precisa entrar no cálculo de
+    // custo (ver api/ai/_lib/usage.ts). 0/undefined pra provider sem isso.
+    toolCalls?: number;
 }
 
 export interface AIProvider {

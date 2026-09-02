@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -16,9 +18,11 @@ import { useAIChat } from '../hooks/useAIChat';
 import { useAIThreads } from '../hooks/useAIThreads';
 import { SuggestedItineraryCard } from './SuggestedItineraryCard';
 import { SuggestedTripCard } from './SuggestedTripCard';
+import { SuggestedExpenseCard } from './SuggestedExpenseCard';
 import { ChatMarkdown } from './ChatMarkdown';
 import { ChevronLeft, Loader2, MessageSquarePlus, Plane, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { Trip } from '@/types';
 
 const SUGGESTIONS = [
     'Quais os melhores dias pra visitar esse destino?',
@@ -81,6 +85,19 @@ function ChatPanel({ tripId }: { tripId?: string }) {
     const { messages, send, sending } = useAIChat(activeThreadId, setActiveThreadId, tripId);
     const [input, setInput] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
+    // Só usado pra montar o card de despesa sugerida (participants pra
+    // dividir igual, mesmo default do formulário manual). Leitura única (não
+    // onSnapshot) — TripDetails.tsx já tem seu próprio listener da mesma
+    // trip; duplicar aqui seria um listener redundante rodando o tempo todo
+    // que o widget existe, não só quando aberto.
+    const [trip, setTrip] = useState<Trip | null>(null);
+
+    useEffect(() => {
+        if (!tripId) { setTrip(null); return; }
+        getDoc(doc(db, 'trips', tripId)).then((snap) => {
+            setTrip(snap.exists() ? ({ id: snap.id, ...snap.data() } as Trip) : null);
+        });
+    }, [tripId]);
 
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -131,6 +148,9 @@ function ChatPanel({ tripId }: { tripId?: string }) {
                         )}
                         {m.role === 'assistant' && m.suggestedTrip && (
                             <SuggestedTripCard trip={m.suggestedTrip} />
+                        )}
+                        {m.role === 'assistant' && trip && m.suggestedExpense && (
+                            <SuggestedExpenseCard trip={trip} expense={m.suggestedExpense} />
                         )}
                     </div>
                 ))}

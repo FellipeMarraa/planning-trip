@@ -1,9 +1,13 @@
 import type { AIProvider, AIProviderMessage, AIProviderResult } from "./types.js";
 import { ProviderNotConfiguredError } from "./types.js";
 
-// llama-3.1-8b-instant foi descontinuado pela Groq (jun/2026) — substituto
-// recomendado oficialmente pela própria Groq pra esse caso de uso.
-const MODEL = "openai/gpt-oss-20b";
+// groq/compound: sistema agentic da própria Groq — decide sozinho quando
+// precisa buscar algo na web (via Tavily, tool embutida) antes de responder,
+// em cima de um modelo maior (GPT-OSS-120B) que o openai/gpt-oss-20b usado
+// antes. Troca deliberada (2026-09-02, pedido do usuário: "mais inteligente
+// e com acesso em tempo real") — custa mais que o modelo anterior, ver
+// PRICING em usage.ts e o teto mensal ajustado junto dessa troca.
+const MODEL = "groq/compound";
 
 export const groqProvider: AIProvider = {
     name: "groq",
@@ -29,12 +33,21 @@ export const groqProvider: AIProvider = {
         }
 
         const data = await res.json();
+        // executed_tools: lista de ferramentas que o Compound chamou pra
+        // montar a resposta (ex.: busca na web) — cada uma é cobrada à
+        // parte do token, ver calculateCostUsd em usage.ts. Campo não tem
+        // schema 100% documentado publicamente pela Groq; conta o length
+        // do array de forma defensiva (ausente/formato inesperado = 0, nunca
+        // quebra a resposta por causa disso).
+        const executedTools = data.choices?.[0]?.message?.executed_tools;
+        const toolCalls = Array.isArray(executedTools) ? executedTools.length : 0;
 
         return {
             text: data.choices?.[0]?.message?.content ?? '',
             promptTokens: data.usage?.prompt_tokens ?? 0,
             completionTokens: data.usage?.completion_tokens ?? 0,
             model: MODEL,
+            toolCalls,
         };
     },
 };

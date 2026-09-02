@@ -106,10 +106,10 @@ O próprio ID do documento é o segredo — imprevisível o suficiente pra servi
 
 ```ts
 interface AiThread { userId: string; tripId: string | null; title: string; archived: boolean; createdAt: Timestamp; updatedAt: Timestamp; lastMessagePreview?: string; }
-interface AiMessage { threadId: string; userId: string; role: 'user' | 'assistant'; content: string; suggestedActivities?: SuggestedActivity[] | null; tripId?: string | null; provider?: string; createdAt: Timestamp; }
+interface AiMessage { threadId: string; userId: string; role: 'user' | 'assistant'; content: string; suggestedActivities?: SuggestedActivity[] | null; suggestedTrip?: SuggestedTrip | null; suggestedExpense?: SuggestedExpense | null; tripId?: string | null; provider?: string; createdAt: Timestamp; }
 ```
 
-Só o `api/ai/chat.ts` escreve conteúdo (Admin SDK) — client nunca escreve direto, só lê a própria conversa. Única exceção: o dono pode fazer `updateDoc` do campo `archived` em `ai_threads` (`firestore.rules` restringe via `diff().affectedKeys().hasOnly(['archived'])`) — "arquivar" só esconde da lista (`src/ai/repositories/aiThreadsRepository.ts`), não apaga `ai_messages`. `tripId` em `ai_threads` é opcional: `null` quando a conversa começou fora do contexto de uma viagem. `suggestedActivities`, quando presente numa mensagem do assistente, é o roteiro sugerido que ainda não foi confirmado pelo usuário — ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 8.
+Só o `api/ai/chat.ts` escreve conteúdo (Admin SDK) — client nunca escreve direto, só lê a própria conversa. Única exceção: o dono pode fazer `updateDoc` do campo `archived` em `ai_threads` (`firestore.rules` restringe via `diff().affectedKeys().hasOnly(['archived'])`) — "arquivar" só esconde da lista (`src/ai/repositories/aiThreadsRepository.ts`), não apaga `ai_messages`. `tripId` em `ai_threads` é opcional: `null` quando a conversa começou fora do contexto de uma viagem. `suggestedActivities`/`suggestedTrip`/`suggestedExpense`, quando presentes numa mensagem do assistente, são sugestões (roteiro/viagem/despesa) que ainda não foram confirmadas pelo usuário — sempre sanitizadas server-side (`sanitizeSuggested*` em `api/ai/chat.ts`, nunca confia no shape que o modelo emite) e escritas de verdade só quando o usuário clica confirmar no card (`src/ai/components/Suggested*Card.tsx`) — ver [SECURITY.md](./SECURITY.md) seção 6.
 
 ### 2.8 `ai_usage/global`
 

@@ -12,6 +12,13 @@ export interface SuggestedTrip {
     baseCurrency: string;
 }
 
+export interface SuggestedExpense {
+    description: string;
+    category: string;
+    amountBRL: number;
+    date: string;
+}
+
 export interface AiMessage {
     id: string;
     threadId: string;
@@ -20,6 +27,7 @@ export interface AiMessage {
     content: string;
     suggestedActivities?: SuggestedActivity[] | null;
     suggestedTrip?: SuggestedTrip | null;
+    suggestedExpense?: SuggestedExpense | null;
 }
 
 export interface AiThread {

@@ -8,7 +8,10 @@ import {
     SUGGESTION_END,
     TRIP_SUGGESTION_START,
     TRIP_SUGGESTION_END,
+    EXPENSE_SUGGESTION_START,
+    EXPENSE_SUGGESTION_END,
     CURRENCY_CODES,
+    EXPENSE_CATEGORIES,
     type TripContext,
 } from "./_lib/prompt.js";
 import { generateReply } from "./_lib/providers/registry.js";
@@ -115,6 +118,55 @@ function sanitizeSuggestedTrip(parsed: unknown): SuggestedTrip | null {
     return { name, startDate, endDate, baseCurrency };
 }
 
+interface SuggestedExpense {
+    description: string;
+    category: string;
+    amountBRL: number;
+    date: string;
+}
+
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+// Mesma defesa em profundidade das outras duas: nunca confiar no shape do
+// JSON que a IA emite. category fora da lista, amountBRL <= 0, ou date fora
+// do formato esperado derrubam a sugestão inteira (volta null) — o mesmo
+// que a regra do Firestore já rejeitaria na escrita real, só que aqui evita
+// nem mostrar um card quebrado pro usuário.
+function sanitizeSuggestedExpense(parsed: unknown): SuggestedExpense | null {
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const obj = parsed as Record<string, unknown>;
+
+    const description = typeof obj.description === 'string' ? obj.description.trim().slice(0, 200) : '';
+    const category = typeof obj.category === 'string' ? obj.category : '';
+    const amountBRL = typeof obj.amountBRL === 'number' ? obj.amountBRL : Number(obj.amountBRL);
+    const date = typeof obj.date === 'string' ? obj.date : '';
+
+    if (!description) return null;
+    if (!EXPENSE_CATEGORIES.includes(category)) return null;
+    if (!Number.isFinite(amountBRL) || amountBRL <= 0) return null;
+    if (!DATETIME_RE.test(date)) return null;
+
+    return { description, category, amountBRL, date };
+}
+
+function extractExpenseSuggestion(text: string): { reply: string; suggestedExpense: SuggestedExpense | null } {
+    const start = text.indexOf(EXPENSE_SUGGESTION_START);
+    const end = text.indexOf(EXPENSE_SUGGESTION_END);
+    if (start === -1 || end === -1 || end < start) {
+        return { reply: text, suggestedExpense: null };
+    }
+
+    const jsonBlock = text.slice(start + EXPENSE_SUGGESTION_START.length, end).trim();
+    const reply = (text.slice(0, start) + text.slice(end + EXPENSE_SUGGESTION_END.length)).trim();
+
+    try {
+        const parsed = JSON.parse(jsonBlock);
+        return { reply, suggestedExpense: sanitizeSuggestedExpense(parsed) };
+    } catch {
+        return { reply, suggestedExpense: null };
+    }
+}
+
 function extractTripSuggestion(text: string): { reply: string; suggestedTrip: SuggestedTrip | null } {
     const start = text.indexOf(TRIP_SUGGESTION_START);
     const end = text.indexOf(TRIP_SUGGESTION_END);
@@ -176,6 +228,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const tripData = tripSnap.data();
             if (tripData && Array.isArray(tripData.participants) && tripData.participants.includes(uid)) {
                 const activitiesSnap = await db.collection('activities').where('tripId', '==', tripId).limit(200).get();
+                // Teto conservador pro tamanho do prompt — bem abaixo do
+                // limit(1000) de segurança já documentado (PERFORMANCE.md);
+                // é resumo agregado (total/por categoria), não a lista crua.
+                const expensesSnap = await db.collection('expenses').where('tripId', '==', tripId).limit(300).get();
+                const byCategory: Record<string, number> = {};
+                let totalBRL = 0;
+                expensesSnap.docs.forEach((d) => {
+                    const exp = d.data();
+                    const amount = Number(exp.amountBRL) || 0;
+                    const category = typeof exp.category === 'string' ? exp.category : 'Outros';
+                    totalBRL += amount;
+                    byCategory[category] = (byCategory[category] || 0) + amount;
+                });
+
                 tripContext = {
                     name: tripData.name,
                     startDate: tripData.startDate,
@@ -185,6 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         const a = d.data();
                         return { dateId: a.dateId, time: a.time, location: a.location, description: a.description };
                     }),
+                    finance: { totalBRL, byCategory, count: expensesSnap.docs.length },
                 };
             }
         }
@@ -237,16 +304,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let replyText: string;
         let suggestedActivities: SuggestedActivity[] | null = null;
         let suggestedTrip: SuggestedTrip | null = null;
+        let suggestedExpense: SuggestedExpense | null = null;
         let costUsd = 0;
 
         try {
             const result = await generateReply(messages);
             const extractedActivities = extractSuggestion(result.text);
             const extractedTrip = extractTripSuggestion(extractedActivities.reply);
-            replyText = extractedTrip.reply;
+            const extractedExpense = extractExpenseSuggestion(extractedTrip.reply);
+            replyText = extractedExpense.reply;
             suggestedActivities = extractedActivities.suggestedActivities;
             suggestedTrip = extractedTrip.suggestedTrip;
-            costUsd = calculateCostUsd(result.promptTokens, result.completionTokens);
+            suggestedExpense = extractedExpense.suggestedExpense;
+            costUsd = calculateCostUsd(result.promptTokens, result.completionTokens, result.toolCalls);
         } catch (error) {
             console.error('❌ Erro ao gerar resposta do assistente de viagem:', error instanceof Error ? error.message : error);
             replyText = 'Não consegui responder agora. Tente novamente em instantes.';
@@ -259,6 +329,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             content: replyText,
             suggestedActivities: suggestedActivities ?? null,
             suggestedTrip: suggestedTrip ?? null,
+            suggestedExpense: suggestedExpense ?? null,
             tripId: tripId ?? null,
             provider: 'groq',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
