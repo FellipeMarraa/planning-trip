@@ -71,21 +71,72 @@ function sanitizeSuggestedActivities(parsed: unknown): SuggestedActivity[] | nul
     return sanitized.length > 0 ? sanitized : null;
 }
 
-function extractSuggestion(text: string): { reply: string; suggestedActivities: SuggestedActivity[] | null } {
-    const start = text.indexOf(SUGGESTION_START);
-    const end = text.indexOf(SUGGESTION_END);
-    if (start === -1 || end === -1 || end < start) {
-        return { reply: text, suggestedActivities: null };
+// Acha o primeiro JSON balanceado (objeto `{...}` ou array `[...]`) depois do
+// marcador de início, em vez de exigir que o marcador de FIM bata caractere
+// a caractere. Achado real em produção (mesmo bug corrigido no CashZ): o
+// modelo às vezes emite "<<<FIM_..._SUGERIDO>>" (2 '>') em vez de "...>>>"
+// (3) — com comparação exata (`text.indexOf(end)`), a extração nunca casava,
+// o texto nunca era limpo, e o bloco cru vazava pro balão de chat do
+// usuário. Contar chaves/colchetes (respeitando string/escape) não depende
+// de nenhum caractere do modelo além do próprio JSON, que já é validado por
+// JSON.parse logo em seguida de qualquer forma. O marcador de fim só é usado,
+// de forma tolerante, pra limpar o texto exibido — nunca pra achar o JSON.
+function extractBlock(text: string, start: string, end: string): { json: string; reply: string } | null {
+    const startIdx = text.indexOf(start);
+    if (startIdx === -1) return null;
+
+    let i = startIdx + start.length;
+    while (i < text.length && text[i] !== '{' && text[i] !== '[') i++;
+    if (i >= text.length) return null;
+    const jsonStart = i;
+    const openChar = text[i];
+    const closeChar = openChar === '{' ? '}' : ']';
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (; i < text.length; i++) {
+        const ch = text[i];
+        if (inString) {
+            if (escaped) escaped = false;
+            else if (ch === '\\') escaped = true;
+            else if (ch === '"') inString = false;
+        } else if (ch === '"') {
+            inString = true;
+        } else if (ch === openChar) {
+            depth++;
+        } else if (ch === closeChar) {
+            depth--;
+            if (depth === 0) { i++; break; }
+        }
+    }
+    if (depth !== 0) return null;
+
+    const json = text.slice(jsonStart, i);
+
+    const endPrefix = end.replace(/>+$/, '');
+    const afterJson = text.slice(i);
+    const prefixIdx = afterJson.indexOf(endPrefix);
+    let consumeEnd = i;
+    if (prefixIdx !== -1 && prefixIdx < 20) {
+        let e = i + prefixIdx + endPrefix.length;
+        while (text[e] === '>') e++;
+        consumeEnd = e;
     }
 
-    const jsonBlock = text.slice(start + SUGGESTION_START.length, end).trim();
-    const reply = (text.slice(0, start) + text.slice(end + SUGGESTION_END.length)).trim();
+    const reply = (text.slice(0, startIdx) + text.slice(consumeEnd)).trim();
+    return { json, reply };
+}
+
+function extractSuggestion(text: string): { reply: string; suggestedActivities: SuggestedActivity[] | null } {
+    const block = extractBlock(text, SUGGESTION_START, SUGGESTION_END);
+    if (!block) return { reply: text, suggestedActivities: null };
 
     try {
-        const parsed = JSON.parse(jsonBlock);
-        return { reply, suggestedActivities: sanitizeSuggestedActivities(parsed) };
+        const parsed = JSON.parse(block.json);
+        return { reply: block.reply, suggestedActivities: sanitizeSuggestedActivities(parsed) };
     } catch {
-        return { reply, suggestedActivities: null };
+        return { reply: block.reply, suggestedActivities: null };
     }
 }
 
@@ -150,38 +201,26 @@ function sanitizeSuggestedExpense(parsed: unknown): SuggestedExpense | null {
 }
 
 function extractExpenseSuggestion(text: string): { reply: string; suggestedExpense: SuggestedExpense | null } {
-    const start = text.indexOf(EXPENSE_SUGGESTION_START);
-    const end = text.indexOf(EXPENSE_SUGGESTION_END);
-    if (start === -1 || end === -1 || end < start) {
-        return { reply: text, suggestedExpense: null };
-    }
-
-    const jsonBlock = text.slice(start + EXPENSE_SUGGESTION_START.length, end).trim();
-    const reply = (text.slice(0, start) + text.slice(end + EXPENSE_SUGGESTION_END.length)).trim();
+    const block = extractBlock(text, EXPENSE_SUGGESTION_START, EXPENSE_SUGGESTION_END);
+    if (!block) return { reply: text, suggestedExpense: null };
 
     try {
-        const parsed = JSON.parse(jsonBlock);
-        return { reply, suggestedExpense: sanitizeSuggestedExpense(parsed) };
+        const parsed = JSON.parse(block.json);
+        return { reply: block.reply, suggestedExpense: sanitizeSuggestedExpense(parsed) };
     } catch {
-        return { reply, suggestedExpense: null };
+        return { reply: block.reply, suggestedExpense: null };
     }
 }
 
 function extractTripSuggestion(text: string): { reply: string; suggestedTrip: SuggestedTrip | null } {
-    const start = text.indexOf(TRIP_SUGGESTION_START);
-    const end = text.indexOf(TRIP_SUGGESTION_END);
-    if (start === -1 || end === -1 || end < start) {
-        return { reply: text, suggestedTrip: null };
-    }
-
-    const jsonBlock = text.slice(start + TRIP_SUGGESTION_START.length, end).trim();
-    const reply = (text.slice(0, start) + text.slice(end + TRIP_SUGGESTION_END.length)).trim();
+    const block = extractBlock(text, TRIP_SUGGESTION_START, TRIP_SUGGESTION_END);
+    if (!block) return { reply: text, suggestedTrip: null };
 
     try {
-        const parsed = JSON.parse(jsonBlock);
-        return { reply, suggestedTrip: sanitizeSuggestedTrip(parsed) };
+        const parsed = JSON.parse(block.json);
+        return { reply: block.reply, suggestedTrip: sanitizeSuggestedTrip(parsed) };
     } catch {
-        return { reply, suggestedTrip: null };
+        return { reply: block.reply, suggestedTrip: null };
     }
 }
 
