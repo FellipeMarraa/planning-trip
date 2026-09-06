@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import L from 'leaflet';
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
 import type { Activity } from '@/types';
+import { getLocatedActivitiesSorted } from '@/lib/dayRoute';
 import { MapAutoResize } from './MapAutoResize';
 
 interface DayRouteMapProps {
@@ -43,12 +44,7 @@ function numberedIcon(n: number, color: string) {
 // outras atividades era o achado real reportado ("mapa flutuando em cima de
 // tudo, impossível acessar o resto"). Retorna null com menos de 1 ponto.
 export function DayRouteMap({ activities }: DayRouteMapProps) {
-    const located = useMemo(
-        () => activities
-            .filter((a): a is Activity & { coordinates: NonNullable<Activity['coordinates']> } => !!a.coordinates)
-            .sort((a, b) => a.time.localeCompare(b.time)),
-        [activities]
-    );
+    const located = useMemo(() => getLocatedActivitiesSorted(activities), [activities]);
 
     if (located.length === 0) return null;
 
