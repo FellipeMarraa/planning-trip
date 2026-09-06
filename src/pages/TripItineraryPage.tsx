@@ -7,13 +7,13 @@ import { useToast } from '@/context/ToastContext';
 import { addDays, differenceInDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CalendarDays, ChevronLeft, CheckCircle2, Circle, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, CheckCircle2, Circle, Clock, Map, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Activity } from '@/types';
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { deleteActivity, deleteAllActivities, toggleActivityComplete } from '@/services/activities';
 import AddActivityDialog from '@/components/trip/AddActivityDialog';
-import { DayRouteMap } from '@/components/trip/DayRouteMap';
+import { DayRouteMapDialog } from '@/components/trip/DayRouteMapDialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -42,6 +42,7 @@ export default function TripItineraryPage() {
     const [currentStep, setCurrentStep] = useState(0);
     const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
     const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+    const [isMapOpen, setIsMapOpen] = useState(false);
 
     const tripDays = useMemo(() => {
         if (!trip?.startDate || !trip?.endDate) return [];
@@ -68,6 +69,7 @@ export default function TripItineraryPage() {
 
     const activeDay = tripDays[currentStep];
     const dayActivities = activities.filter(a => a.dateId === activeDay?.id);
+    const hasLocatedActivities = dayActivities.some(a => a.coordinates);
 
     // Com muitos dias a tira de dias transborda (overflow-x-auto) — trocar de
     // dia pelos botões Anterior/Próximo mudava currentStep mas nunca rolava a
@@ -171,17 +173,27 @@ export default function TripItineraryPage() {
                                 <h2 className="text-xl font-semibold text-foreground capitalize leading-none">{activeDay?.label}</h2>
                                 <p className="text-primary/80 text-xs font-medium mt-2 capitalize">{activeDay?.weekDay}</p>
                             </div>
-                            {canEdit && (
-                                <Button
-                                    onClick={() => { setActivityToEdit(null); setIsAddOpen(true); }}
-                                    className="rounded-full h-9 px-5 shadow-sm"
-                                >
-                                    <Plus className="w-3.5 h-3.5 mr-2" /> Adicionar
-                                </Button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {hasLocatedActivities && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setIsMapOpen(true)}
+                                        className="rounded-full h-9 w-9 p-0 shadow-sm"
+                                        aria-label="Ver mapa do dia"
+                                    >
+                                        <Map className="w-4 h-4" />
+                                    </Button>
+                                )}
+                                {canEdit && (
+                                    <Button
+                                        onClick={() => { setActivityToEdit(null); setIsAddOpen(true); }}
+                                        className="rounded-full h-9 px-5 shadow-sm"
+                                    >
+                                        <Plus className="w-3.5 h-3.5 mr-2" /> Adicionar
+                                    </Button>
+                                )}
+                            </div>
                         </div>
-
-                        <DayRouteMap activities={dayActivities} />
 
                         <div className="bg-card border border-border rounded-3xl flex flex-col min-h-0 flex-grow relative">
 
@@ -274,6 +286,13 @@ export default function TripItineraryPage() {
                 tripId={tripId || ''}
                 dateId={activityToEdit?.dateId || activeDay?.id || ''}
                 activityToEdit={activityToEdit}
+            />
+
+            <DayRouteMapDialog
+                open={isMapOpen}
+                onClose={() => setIsMapOpen(false)}
+                activities={dayActivities}
+                dayLabel={activeDay ? `${activeDay.label} · ${activeDay.weekDay}` : undefined}
             />
 
             <AlertDialog open={!!activityToDelete} onOpenChange={() => setActivityToDelete(null)}>

@@ -1,11 +1,12 @@
 // src/components/trip/LocationPicker.tsx
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, MapPin, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchAddress, reverseGeocode, type AddressResult } from '@/lib/geocoding';
+import { MapAutoResize } from './MapAutoResize';
 
 export interface LocationValue {
     location: string;
@@ -20,17 +21,6 @@ interface LocationPickerProps {
 const WORLD_VIEW_CENTER: [number, number] = [20, 0];
 const WORLD_VIEW_ZOOM = 2;
 const PIN_ZOOM = 14;
-
-// Dialog abre com animação — o container do mapa pode nascer com tamanho 0
-// e o Leaflet calcula os tiles errado nesse instante. Recalcula pós-mount.
-function InvalidateSizeOnMount() {
-    const map = useMap();
-    useEffect(() => {
-        const id = setTimeout(() => map.invalidateSize(), 150);
-        return () => clearTimeout(id);
-    }, [map]);
-    return null;
-}
 
 function ClickToPin({ onPick }: { onPick: (lat: number, lng: number) => void }) {
     useMapEvents({
@@ -149,7 +139,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        <InvalidateSizeOnMount />
+                        <MapAutoResize />
                         <ClickToPin onPick={handleMapPick} />
                         {value.coordinates && <Marker position={[value.coordinates.lat, value.coordinates.lng]} />}
                     </MapContainer>
