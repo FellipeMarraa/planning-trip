@@ -75,10 +75,12 @@ Quem pode registrar: qualquer `OWNER`/`EDITOR` da viagem, entre **quaisquer** do
 ### 2.4 `Activity`
 
 ```ts
-interface Activity { id: string; tripId: string; dateId: string; time: string; location: string; description: string; completed: boolean; }
+interface Activity { id: string; tripId: string; dateId: string; time: string; location: string; description: string; completed: boolean; coordinates?: { lat: number; lng: number }; }
 ```
 
 `dateId` agrupa atividades por dia no itinerário — chave de agrupamento denormalizada, não uma referência a outro doc.
+
+`coordinates` é opcional e aditivo — preenchido só quando o usuário escolhe a localização via `LocationPicker.tsx` (busca de endereço ou clique no mapa, ver [ARCHITECTURE.md](./ARCHITECTURE.md)); atividades criadas antes dessa feature, ou onde o usuário só digitou o texto livre em `location`, não têm o campo. `DayRouteMap.tsx` filtra só as atividades com `coordinates` pra desenhar o mapa do dia — nenhuma leitura/escrita trata a ausência do campo como erro.
 
 ### 2.5 `UserProfile` (coleção `users`)
 

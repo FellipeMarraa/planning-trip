@@ -73,4 +73,5 @@ export interface Activity {
     location: string;
     description: string;
     completed: boolean;
+    coordinates?: { lat: number; lng: number }; // opcional — atividades antigas/sem localização escolhida no picker não têm
 }

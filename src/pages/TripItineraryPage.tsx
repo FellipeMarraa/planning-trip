@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { deleteActivity, deleteAllActivities, toggleActivityComplete } from '@/services/activities';
 import AddActivityDialog from '@/components/trip/AddActivityDialog';
+import { DayRouteMap } from '@/components/trip/DayRouteMap';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -179,6 +180,8 @@ export default function TripItineraryPage() {
                                 </Button>
                             )}
                         </div>
+
+                        <DayRouteMap activities={dayActivities} />
 
                         <div className="bg-card border border-border rounded-3xl flex flex-col min-h-0 flex-grow relative">
 

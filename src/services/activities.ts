@@ -13,17 +13,31 @@ function chunk<T>(items: T[], size: number): T[][] {
     return chunks;
 }
 
+interface ActivityCoordinates {
+    lat: number;
+    lng: number;
+}
+
 interface CreateActivityInput {
     tripId: string;
     dateId: string;
     time: string;
     location: string;
     description: string;
+    coordinates?: ActivityCoordinates;
+}
+
+// Firestore rejeita qualquer campo com valor undefined (addDoc/updateDoc
+// lançam erro) — nunca passar coordinates: undefined direto no objeto,
+// omitir a chave inteira quando não houver coordenada.
+function withOptionalCoordinates<T extends { coordinates?: ActivityCoordinates }>(input: T) {
+    const { coordinates, ...rest } = input;
+    return coordinates ? { ...rest, coordinates } : rest;
 }
 
 export async function createActivity(input: CreateActivityInput) {
     await addDoc(collection(db, 'activities'), {
-        ...input,
+        ...withOptionalCoordinates(input),
         completed: false,
         createdAt: serverTimestamp(),
     });
@@ -37,10 +51,11 @@ interface UpdateActivityInput {
     time: string;
     location: string;
     description: string;
+    coordinates?: ActivityCoordinates;
 }
 
 export async function updateActivity(activityId: string, input: UpdateActivityInput) {
-    await updateDoc(doc(db, 'activities', activityId), { ...input });
+    await updateDoc(doc(db, 'activities', activityId), withOptionalCoordinates(input));
 }
 
 export async function deleteActivity(activityId: string) {

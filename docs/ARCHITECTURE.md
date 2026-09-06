@@ -85,6 +85,15 @@ Primeira vez que o planning-trip tem backend próprio (antes disso, o único có
 - **Múltiplas conversas, mesma estrutura do widget de IA do CashZ**: `AiAssistantContext` guarda a thread ativa, compartilhada entre `ThreadList` (lista as conversas do usuário via `useAIThreads`, botão "Nova conversa" zera a thread ativa) e `ChatPanel` (`AiAssistantWidget.tsx`, navegação em pilha lista↔chat, sem Dialog/Popover do shadcn pra poder virar tela cheia no mobile). "Arquivar" uma conversa (`archiveThread`, `src/ai/repositories/aiThreadsRepository.ts`) só marca `archived:true` — histórico continua em `ai_messages`, só some da lista.
 - **Sem `ai_config` administrável nem `ai_usage_logs`/`ai_user_limits` por usuário**: provider ativo/fallback e limites de custo são constantes hardcoded no código (`api/ai/_lib/providers/registry.ts`, `api/ai/_lib/usage.ts`) — `/admin` (ver [PROJECT.md](./PROJECT.md) seção 6) tem visão geral e erros reportados, mas não edita config de IA em runtime. Só existe um contador global simples (`ai_usage/global`).
 
+## 8.1 Mapa do roteiro (`react-leaflet`, geocoding via Nominatim)
+
+Única integração externa do projeto que **não** passa por `api/` — porque, ao contrário do provedor de IA (seção 8), não há chave/segredo pra proteger nem custo por token: tiles do OpenStreetMap e geocoding via [Nominatim](https://nominatim.openstreetmap.org) são serviços públicos e gratuitos, chamados direto do client (`src/lib/geocoding.ts`).
+
+- **`Activity.coordinates`** (opcional, ver [DATABASE.md](./DATABASE.md) 2.4) é preenchido por `LocationPicker.tsx` (dentro de `AddActivityDialog.tsx`) de duas formas: busca de endereço (`searchAddress`, debounced 600ms — política de uso do Nominatim pede ~1 req/s) ou clique num `MapContainer` inline (`reverseGeocode` preenche o texto do local a partir do ponto clicado).
+- **`DayRouteMap.tsx`** (`TripItineraryPage.tsx`) mostra só as atividades do dia ativo que têm `coordinates`, ordenadas por horário, com uma `Polyline` reta ligando os pontos — **não é rota de rua/GPS real** (exigiria um serviço pago de directions, fora do escopo desta entrega).
+- **Ícone padrão do Leaflet quebra com bundler** (Vite não resolve o caminho relativo que a lib usa por padrão) — corrigido uma única vez em `src/lib/leafletIcons.ts`, chamado em `main.tsx` antes de qualquer mapa renderizar.
+- **Leaflet dentro de `Dialog` (Radix)**: o container pode nascer com tamanho 0 durante a animação de abertura do modal, quebrando o cálculo dos tiles — `LocationPicker.tsx` chama `map.invalidateSize()` num efeito pós-mount pra corrigir.
+
 ## 9. Convenções já validadas (siga-as)
 
 1. Ler é hook+`onSnapshot`; escrever é service. Não misturar.

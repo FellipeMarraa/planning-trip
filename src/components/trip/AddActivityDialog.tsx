@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlignLeft, Clock, MapPin, Sparkles } from "lucide-react";
 import type { Activity } from '@/types';
+import { LocationPicker, type LocationValue } from './LocationPicker';
 
 interface AddActivityDialogProps {
     open: boolean;
@@ -18,12 +19,18 @@ interface AddActivityDialogProps {
     activityToEdit?: Activity | null;
 }
 
-const EMPTY_FORM = { time: '', location: '', description: '' };
+interface FormState {
+    time: string;
+    description: string;
+    location: LocationValue;
+}
+
+const EMPTY_FORM: FormState = { time: '', description: '', location: { location: '' } };
 
 export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, activityToEdit }: AddActivityDialogProps) {
     const { showError } = useToast();
     const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState(EMPTY_FORM);
+    const [formData, setFormData] = useState<FormState>(EMPTY_FORM);
 
     const isEditing = !!activityToEdit;
     const formattedDate = dateId ? dateId.split('-').reverse().join('/') : '--/--/----';
@@ -31,7 +38,11 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, 
     useEffect(() => {
         if (!open) return;
         setFormData(activityToEdit
-            ? { time: activityToEdit.time, location: activityToEdit.location, description: activityToEdit.description }
+            ? {
+                time: activityToEdit.time,
+                description: activityToEdit.description,
+                location: { location: activityToEdit.location, coordinates: activityToEdit.coordinates },
+            }
             : EMPTY_FORM);
     }, [open, activityToEdit]);
 
@@ -39,10 +50,16 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, 
         e.preventDefault();
         setLoading(true);
         try {
+            const payload = {
+                time: formData.time,
+                description: formData.description,
+                location: formData.location.location,
+                coordinates: formData.location.coordinates,
+            };
             if (activityToEdit) {
-                await updateActivity(activityToEdit.id, formData);
+                await updateActivity(activityToEdit.id, payload);
             } else {
-                await createActivity({ tripId, dateId, ...formData });
+                await createActivity({ tripId, dateId, ...payload });
             }
             onOpenChange(false);
         } catch (error) {
@@ -56,8 +73,8 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[400px] rounded-3xl p-0 overflow-hidden">
-                <form onSubmit={handleSubmit}>
-                    <div className="p-6 space-y-5">
+                <form onSubmit={handleSubmit} className="flex flex-col max-h-[85vh]">
+                    <div className="p-6 space-y-5 overflow-y-auto">
                         <DialogHeader className="space-y-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <Sparkles className="w-4 h-4 text-primary" />
@@ -89,12 +106,9 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, 
                                 <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                                     <MapPin className="w-3.5 h-3.5" /> Local
                                 </Label>
-                                <Input
-                                    placeholder="Nome do local ou atração"
-                                    className="h-10"
+                                <LocationPicker
                                     value={formData.location}
-                                    onChange={e => setFormData({...formData, location: e.target.value})}
-                                    required
+                                    onChange={(next) => setFormData({ ...formData, location: next })}
                                 />
                             </div>
 
@@ -112,7 +126,7 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, 
                         </div>
                     </div>
 
-                    <div className="p-4 bg-muted/40 border-t border-border">
+                    <div className="p-4 bg-muted/40 border-t border-border shrink-0">
                         <Button
                             disabled={loading}
                             className="w-full h-10 rounded-lg shadow-sm"
