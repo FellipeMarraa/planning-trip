@@ -4,20 +4,24 @@ import { db } from '@/config/firebase';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import type { Expense } from '@/types';
 
-// Todas as despesas pagas por uma lista de uids (o próprio usuário +
-// parceiros de carteira compartilhada mútua) em moeda estrangeira — moeda
-// != BRL já É a demanda de carteira, sem flag separada (ver
-// AddExpenseDialog.tsx). Filtro client-side (evita índice composto novo só
-// pra essa tela; expenses já tem índices pra paginação normal da viagem,
-// ver FIREBASE.md). `in` aceita até 10 valores — mesmo teto de useCurrencyLots.
-export function useWalletExpenses(paidByUids: string[]) {
+// Todas as despesas em moeda estrangeira em que uma lista de uids (o
+// próprio usuário + parceiros de carteira compartilhada mútua) é
+// PARTICIPANTE da divisão — não quem pagou. Cada participante precisa ter
+// em mãos a própria cota da despesa em moeda local, independente de quem
+// registrou como paidBy (achado real: filtrar só por paidBy deixava a
+// despesa inteira de fora da carteira de quem divide mas não pagou).
+// `array-contains-any` aceita até 10 valores — mesmo teto de useCurrencyLots.
+// Filtro de moeda != BRL é client-side (evita índice composto novo só pra
+// essa tela; expenses já tem índices pra paginação normal da viagem, ver
+// FIREBASE.md).
+export function useWalletExpenses(poolUids: string[]) {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const uidsKey = [...paidByUids].sort().join(',');
+    const uidsKey = [...poolUids].sort().join(',');
 
     useEffect(() => {
-        if (paidByUids.length === 0) {
+        if (poolUids.length === 0) {
             setExpenses([]);
             setLoading(false);
             return;
@@ -26,7 +30,7 @@ export function useWalletExpenses(paidByUids: string[]) {
         setError(null);
         const q = query(
             collection(db, 'expenses'),
-            where('paidBy', 'in', paidByUids),
+            where('participants', 'array-contains-any', poolUids),
             limit(500)
         );
 

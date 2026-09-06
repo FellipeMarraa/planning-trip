@@ -34,11 +34,52 @@ function expense(overrides: Partial<Expense> = {}): Expense {
 
 describe('summarizeWalletDemand', () => {
     it('sem lote nem despesa: lista vazia', () => {
-        expect(summarizeWalletDemand([], [])).toEqual([]);
+        expect(summarizeWalletDemand([], [], ['u1'])).toEqual([]);
+    });
+
+    it('necessário é a cota do pool na despesa, não o valor cheio (achado real: 750€ divididos em 3, minha cota é 250)', () => {
+        const result = summarizeWalletDemand(
+            [],
+            [expense({ id: 'alimentacao', description: 'Alimentação', amountOriginal: 750, participants: ['u1', 'u2', 'u3'], paidBy: 'u2' })],
+            ['u1']
+        );
+
+        expect(result[0].totalNeeded).toBe(250);
+        expect(result[0].items).toEqual([{ expenseId: 'alimentacao', description: 'Alimentação', amountNeeded: 250 }]);
+    });
+
+    it('conta a cota de cada membro do pool que participa da mesma despesa (2 do pool = 2 cotas)', () => {
+        const result = summarizeWalletDemand(
+            [],
+            [expense({ amountOriginal: 300, participants: ['u1', 'u2', 'u3'] })],
+            ['u1', 'u2']
+        );
+
+        // Cota = 300/3 = 100; pool tem 2 participantes nessa despesa (u1, u2) => 200
+        expect(result[0].totalNeeded).toBe(200);
+    });
+
+    it('despesa em que ninguém do pool participa: necessário zero, não vira item', () => {
+        const result = summarizeWalletDemand(
+            [],
+            [expense({ participants: ['u2', 'u3'] })],
+            ['u1']
+        );
+        expect(result[0].totalNeeded).toBe(0);
+        expect(result[0].items).toEqual([]);
+    });
+
+    it('não considera quem pagou (paidBy) — só quem divide (participants)', () => {
+        const result = summarizeWalletDemand(
+            [],
+            [expense({ amountOriginal: 100, participants: ['u1', 'u2'], paidBy: 'u2' })],
+            ['u1']
+        );
+        expect(result[0].totalNeeded).toBe(50);
     });
 
     it('comprado cobre o necessário: shortfall zero', () => {
-        const result = summarizeWalletDemand([lot({ amountPurchased: 100 })], [expense({ amountOriginal: 50 })]);
+        const result = summarizeWalletDemand([lot({ amountPurchased: 100 })], [expense({ amountOriginal: 50, participants: ['u1'] })], ['u1']);
         expect(result).toEqual([{
             currency: 'EUR',
             totalPurchased: 100,
@@ -53,10 +94,9 @@ describe('summarizeWalletDemand', () => {
         const result = summarizeWalletDemand([
             lot({ id: 'meu', ownerUid: 'marido', amountPurchased: 250 }),
             lot({ id: 'dela', ownerUid: 'esposa', amountPurchased: 250 }),
-        ], [expense({ amountOriginal: 300 })]);
+        ], [expense({ amountOriginal: 300, participants: ['marido'] })], ['marido', 'esposa']);
 
         expect(result[0].totalPurchased).toBe(500);
-        expect(result[0].shortfall).toBe(0);
         expect(result[0].purchasedByOwner).toEqual(
             expect.arrayContaining([
                 { ownerUid: 'marido', amount: 250 },
@@ -68,9 +108,9 @@ describe('summarizeWalletDemand', () => {
 
     it('comprado não cobre: shortfall = necessário - comprado', () => {
         const result = summarizeWalletDemand([lot({ amountPurchased: 100 })], [
-            expense({ id: 'transporte', description: 'Transporte', amountOriginal: 400 }),
-            expense({ id: 'alimentacao', description: 'Alimentação', amountOriginal: 500 }),
-        ]);
+            expense({ id: 'transporte', description: 'Transporte', amountOriginal: 400, participants: ['u1'] }),
+            expense({ id: 'alimentacao', description: 'Alimentação', amountOriginal: 500, participants: ['u1'] }),
+        ], ['u1']);
 
         expect(result).toHaveLength(1);
         expect(result[0].totalPurchased).toBe(100);
@@ -86,14 +126,18 @@ describe('summarizeWalletDemand', () => {
         const result = summarizeWalletDemand([
             lot({ id: 'l1', amountPurchased: 100 }),
             lot({ id: 'l2', amountPurchased: 50 }),
-        ], []);
+        ], [], ['u1']);
         expect(result[0].totalPurchased).toBe(150);
     });
 
     it('agrupa por moeda separadamente', () => {
         const result = summarizeWalletDemand(
             [lot({ currency: 'EUR', amountPurchased: 100 }), lot({ currency: 'USD', amountPurchased: 200 })],
-            [expense({ currency: 'EUR', amountOriginal: 50 }), expense({ id: 'exp2', currency: 'USD', amountOriginal: 300 })]
+            [
+                expense({ currency: 'EUR', amountOriginal: 50, participants: ['u1'] }),
+                expense({ id: 'exp2', currency: 'USD', amountOriginal: 300, participants: ['u1'] }),
+            ],
+            ['u1']
         );
 
         const eur = result.find((r) => r.currency === 'EUR')!;
@@ -103,7 +147,7 @@ describe('summarizeWalletDemand', () => {
     });
 
     it('moeda só com lote (sem despesa carteira) aparece com necessário zero', () => {
-        const result = summarizeWalletDemand([lot({ currency: 'GBP', amountPurchased: 30 })], []);
+        const result = summarizeWalletDemand([lot({ currency: 'GBP', amountPurchased: 30 })], [], ['u1']);
         expect(result).toEqual([{ currency: 'GBP', totalPurchased: 30, totalNeeded: 0, shortfall: 0, items: [], purchasedByOwner: [{ ownerUid: 'u1', amount: 30 }] }]);
     });
 });

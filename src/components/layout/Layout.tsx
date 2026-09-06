@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plane, LogOut, Settings, User, Wallet } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
 import { UserAvatar } from '@/components/common/user-avatar';
+import { useUserTrips } from '@/hooks/useUserTrips';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,6 +20,11 @@ const AiAssistantWidget = lazy(() => import('@/ai/components/AiAssistantWidget')
 export default function Layout({ children }: { children: React.ReactNode }) {
     const { user, customPhotoURL, logout, isGlobalAdmin } = useAuth();
     const navigate = useNavigate();
+    // Carteira de câmbio só se aplica a viagem com moeda de referência
+    // estrangeira (mesmo critério de WalletPage.tsx/AddExpenseDialog.tsx) —
+    // sem nenhuma, nem o item do menu nem a rota /wallet ficam acessíveis.
+    const { trips } = useUserTrips();
+    const hasNonBrlTrip = trips.some((t) => t.baseCurrency !== 'BRL');
 
     const handleLogout = async () => {
         await logout();
@@ -66,9 +72,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                     <DropdownMenuItem onSelect={() => navigate('/profile')}>
                                         <User className="w-4 h-4" /> Perfil
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => navigate('/wallet')}>
-                                        <Wallet className="w-4 h-4" /> Carteira
-                                    </DropdownMenuItem>
+                                    {hasNonBrlTrip && (
+                                        <DropdownMenuItem onSelect={() => navigate('/wallet')}>
+                                            <Wallet className="w-4 h-4" /> Carteira
+                                        </DropdownMenuItem>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
 

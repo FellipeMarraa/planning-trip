@@ -21,14 +21,19 @@ export interface WalletCurrencySummary {
     purchasedByOwner: WalletOwnerContribution[]; // breakdown pra carteira compartilhada (ver lib/walletShares.ts)
 }
 
+function participantShare(expense: Expense): number {
+    return expense.amountOriginal / (expense.participants.length || 1);
+}
+
 // Planejamento, não consumo real: soma quanto já foi comprado (lotes) vs.
-// quanto as despesas marcadas "carteira" precisam (currency/amountOriginal
-// de cada uma), por moeda. Nunca bloqueia — o que falta só vira um número
-// (shortfall) e a lista de despesas que compõem a demanda (motivo). `lots`/
-// `walletExpenses` já vêm filtrados pelo chamador pro pool certo (só o
-// próprio usuário, ou usuário + parceiros de carteira mútua) — esta função
-// não sabe nem precisa saber de compartilhamento, só agrupa por dono.
-export function summarizeWalletDemand(lots: CurrencyLot[], walletExpenses: Expense[]): WalletCurrencySummary[] {
+// quanto o pool precisa (cota de cada membro do pool nas despesas em que
+// ele DIVIDE, não o valor cheio da despesa) — cada participante precisa ter
+// em mãos a própria cota em moeda local, independente de quem pagou. Uma
+// despesa de €750 dividida em 3 conta €250 se só 1 membro do pool participa
+// dela, ou €500 se 2 membros do pool participam. `walletExpenses` já vem
+// filtrado pelo chamador (useWalletExpenses: participants array-contains-any
+// poolUids) — pode conter despesa onde nem todo mundo do pool participa.
+export function summarizeWalletDemand(lots: CurrencyLot[], walletExpenses: Expense[], poolUids: string[]): WalletCurrencySummary[] {
     const currencies = new Set([...lots.map((l) => l.currency), ...walletExpenses.map((e) => e.currency)]);
 
     return Array.from(currencies).map((currency) => {
@@ -43,12 +48,17 @@ export function summarizeWalletDemand(lots: CurrencyLot[], walletExpenses: Expen
             .map(([ownerUid, amount]) => ({ ownerUid, amount }));
 
         const expensesInCurrency = walletExpenses.filter((e) => e.currency === currency);
-        const totalNeeded = expensesInCurrency.reduce((sum, e) => sum + e.amountOriginal, 0);
-        const items: WalletDemandItem[] = expensesInCurrency.map((e) => ({
-            expenseId: e.id,
-            description: e.description,
-            amountNeeded: e.amountOriginal,
-        }));
+        const items: WalletDemandItem[] = expensesInCurrency
+            .map((e) => {
+                const poolParticipants = e.participants.filter((p) => poolUids.includes(p)).length;
+                return {
+                    expenseId: e.id,
+                    description: e.description,
+                    amountNeeded: participantShare(e) * poolParticipants,
+                };
+            })
+            .filter((item) => item.amountNeeded > 0);
+        const totalNeeded = items.reduce((sum, item) => sum + item.amountNeeded, 0);
 
         return {
             currency,

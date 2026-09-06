@@ -1,5 +1,6 @@
 // src/pages/WalletPage.tsx
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useUserTrips } from '@/hooks/useUserTrips';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
@@ -13,7 +14,7 @@ import { declareWalletShare, revokeWalletShare } from '@/services/walletShares';
 import { getMemberName, isGhostUid } from '@/lib/members';
 import { CurrencyLotForm } from '@/components/trip/CurrencyLotForm';
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/common/empty-state";
+import PageLoader from "@/components/common/page-loader";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Plus, Trash2, Users, Wallet, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CurrencyLot, Trip, UserProfile } from '@/types';
@@ -154,7 +155,8 @@ function ShareControl({ trip, myUid, profiles, declaredByMe, declaredToMe, onDec
 
 export default function WalletPage() {
     const { user } = useAuth();
-    const { trips } = useUserTrips();
+    const navigate = useNavigate();
+    const { trips, loading: tripsLoading } = useUserTrips();
     const { declaredByMe, declaredToMe } = useWalletShares();
     const [lotFormTripId, setLotFormTripId] = useState<string | null>(null);
 
@@ -162,6 +164,13 @@ export default function WalletPage() {
     // — viagem BRL não tem conceito de "comprar moeda antes", mesmo que
     // alguma despesa avulsa tenha sido lançada noutra moeda por engano.
     const nonBrlTrips = useMemo(() => trips.filter((t) => t.baseCurrency !== 'BRL'), [trips]);
+
+    // Bloqueia acesso de verdade (não só esconde o item do menu, ver
+    // Layout.tsx) — sem nenhuma viagem em moeda estrangeira, a rota /wallet
+    // não é navegável nem por URL direta.
+    useEffect(() => {
+        if (!tripsLoading && nonBrlTrips.length === 0) navigate('/');
+    }, [tripsLoading, nonBrlTrips.length, navigate]);
 
     const mutualPartnersByTrip = useMemo(
         () => computeMutualPartnersByTrip(declaredByMe, declaredToMe),
@@ -194,8 +203,8 @@ export default function WalletPage() {
             const poolUids = user ? [user.uid, ...partners] : partners;
 
             const tripLots = lots.filter((l) => l.tripId === trip.id && poolUids.includes(l.ownerUid));
-            const tripExpenses = expenses.filter((e) => e.tripId === trip.id && poolUids.includes(e.paidBy));
-            const summaries = summarizeWalletDemand(tripLots, tripExpenses);
+            const tripExpenses = expenses.filter((e) => e.tripId === trip.id && e.participants.some((p) => poolUids.includes(p)));
+            const summaries = summarizeWalletDemand(tripLots, tripExpenses, poolUids);
             return { trip, tripLots, summaries };
         });
     }, [nonBrlTrips, mutualPartnersByTrip, lots, expenses, user]);
@@ -226,6 +235,12 @@ export default function WalletPage() {
         }
     };
 
+    // Guarda de acesso vem depois de todos os hooks (nunca antes — early
+    // return antes de chamar hook quebraria as Rules of Hooks). Enquanto
+    // carrega ou não há viagem em moeda estrangeira, o efeito acima já
+    // redireciona pra "/" — aqui só evita desenhar a página por um instante.
+    if (tripsLoading || nonBrlTrips.length === 0) return <PageLoader />;
+
     return (
         <div className="max-w-3xl mx-auto space-y-6">
             <div>
@@ -233,18 +248,11 @@ export default function WalletPage() {
                     <Wallet className="w-5 h-5 text-primary" /> Carteira de câmbio
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                    Planejamento pessoal — quanto você já comprou de cada moeda vs. quanto as despesas marcadas "carteira" precisam. Não afeta a divisão de gastos com o grupo.
+                    Planejamento pessoal — quanto você já comprou de cada moeda vs. quanto a sua cota nas despesas em moeda estrangeira precisa. Não afeta a divisão de gastos com o grupo.
                 </p>
             </div>
 
-            {tripSections.length === 0 ? (
-                <EmptyState
-                    icon={Wallet}
-                    message="Nenhuma viagem com moeda estrangeira ainda — a carteira só se aplica a viagens que não são em Real (BRL)."
-                    dashed={false}
-                />
-            ) : (
-                tripSections.map(({ trip, tripLots, summaries }) => {
+            {tripSections.map(({ trip, tripLots, summaries }) => {
                     const declaredByMeSet = new Set(declaredByMe.filter((d) => d.tripId === trip.id).map((d) => d.toUid));
                     const declaredToMeSet = new Set(declaredToMe.filter((d) => d.tripId === trip.id).map((d) => d.fromUid));
 
@@ -288,8 +296,7 @@ export default function WalletPage() {
                             )}
                         </div>
                     );
-                })
-            )}
+                })}
 
             {user && (
                 <CurrencyLotForm

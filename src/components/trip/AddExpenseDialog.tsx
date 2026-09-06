@@ -227,11 +227,6 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {!isBRL && (
-                                    <p className="text-[11px] text-muted-foreground">
-                                        Moeda estrangeira entra na sua carteira de câmbio (ver /wallet) — cotação de mercado, sem taxa de conversão.
-                                    </p>
-                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium text-muted-foreground">Valor ({formData.currency})</Label>
