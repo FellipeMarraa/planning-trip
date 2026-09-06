@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { useUserTrips } from '@/hooks/useUserTrips';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
 import { useCurrencyLots } from '@/hooks/useCurrencyLots';
@@ -92,7 +93,7 @@ function CurrencySummaryCard({ summary, currency, lots, trip, profiles, onDelete
                         <div key={lot.id} className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">
                                 {isShared && `${getMemberName(lot.ownerUid, trip, profiles)} — `}
-                                {formatCurrency(lot.amountPurchased, currency)} a R$ {lot.ratePaidBRL.toFixed(4)} ({lot.purchaseDate})
+                                {formatCurrency(lot.amountPurchased, currency)} a R$ {lot.ratePaidBRL.toFixed(2)} ({lot.purchaseDate})
                             </span>
                             <button
                                 type="button"
@@ -187,8 +188,20 @@ export default function WalletPage() {
         return Array.from(uids);
     }, [user, mutualPartnersByTrip]);
 
-    const { lots } = useCurrencyLots(fetchUids);
-    const { expenses } = useWalletExpenses(fetchUids);
+    const { showError } = useToast();
+    const { lots, error: lotsError } = useCurrencyLots(fetchUids);
+    const { expenses, error: expensesError } = useWalletExpenses(fetchUids);
+
+    // Achado real: um erro de leitura (ex.: permissão) nesses dois hooks
+    // ficava totalmente silencioso — a tela só parecia "sem nenhuma compra
+    // registrada", sem indicar que os dados na verdade falharam ao
+    // carregar. Nunca confundir "vazio" com "erro" de novo.
+    useEffect(() => {
+        if (lotsError) showError(lotsError);
+    }, [lotsError, showError]);
+    useEffect(() => {
+        if (expensesError) showError(expensesError);
+    }, [expensesError, showError]);
 
     const allParticipantUids = useMemo(() => {
         const uids = new Set<string>();

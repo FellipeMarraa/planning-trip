@@ -93,7 +93,6 @@ export function CurrencyLotForm({ open, onOpenChange, tripId, ownerUid, ownerLab
                                 <MoneyInput
                                     className="h-10"
                                     prefix="R$"
-                                    decimals={4}
                                     value={ratePaidBRL}
                                     onValueChange={setRatePaidBRL}
                                     required
