@@ -9,6 +9,14 @@
       ]
     },
     {
+      "collectionGroup": "currency_lots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerUid", "order": "ASCENDING" },
+        { "fieldPath": "purchaseDate", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ai_messages",
       "queryScope": "COLLECTION",
       "fields": [
