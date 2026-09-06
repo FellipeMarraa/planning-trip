@@ -33,6 +33,16 @@ export async function toggleActivityComplete(activityId: string, currentStatus: 
     await updateDoc(doc(db, 'activities', activityId), { completed: !currentStatus });
 }
 
+interface UpdateActivityInput {
+    time: string;
+    location: string;
+    description: string;
+}
+
+export async function updateActivity(activityId: string, input: UpdateActivityInput) {
+    await updateDoc(doc(db, 'activities', activityId), { ...input });
+}
+
 export async function deleteActivity(activityId: string) {
     await deleteDoc(doc(db, 'activities', activityId));
 }

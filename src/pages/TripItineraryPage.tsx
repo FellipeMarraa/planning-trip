@@ -7,7 +7,8 @@ import { useToast } from '@/context/ToastContext';
 import { addDays, differenceInDays, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CalendarDays, ChevronLeft, CheckCircle2, Circle, Clock, MapPin, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, CheckCircle2, Circle, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import type { Activity } from '@/types';
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/empty-state";
 import { deleteActivity, deleteAllActivities, toggleActivityComplete } from '@/services/activities';
@@ -36,6 +37,7 @@ export default function TripItineraryPage() {
     }, [activitiesError, showError]);
 
     const [isAddOpen, setIsAddOpen] = useState(false);
+    const [activityToEdit, setActivityToEdit] = useState<Activity | null>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
     const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
@@ -157,7 +159,7 @@ export default function TripItineraryPage() {
                             </div>
                             {canEdit && (
                                 <Button
-                                    onClick={() => setIsAddOpen(true)}
+                                    onClick={() => { setActivityToEdit(null); setIsAddOpen(true); }}
                                     className="rounded-full h-9 px-5 shadow-sm"
                                 >
                                     <Plus className="w-3.5 h-3.5 mr-2" /> Adicionar
@@ -187,12 +189,20 @@ export default function TripItineraryPage() {
                                                         <Clock className="w-3 h-3" /> {act.time}
                                                     </span>
                                                     {canEdit && (
-                                                        <button
-                                                            onClick={() => setActivityToDelete(act.id)}
-                                                            className="p-1.5 text-muted-foreground hover:text-destructive transition-colors bg-muted rounded-lg active:scale-90"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button
+                                                                onClick={() => { setActivityToEdit(act); setIsAddOpen(true); }}
+                                                                className="p-1.5 text-muted-foreground hover:text-primary transition-colors bg-muted rounded-lg active:scale-90"
+                                                            >
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setActivityToDelete(act.id)}
+                                                                className="p-1.5 text-muted-foreground hover:text-destructive transition-colors bg-muted rounded-lg active:scale-90"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <h4 className={`text-sm font-medium mt-1 truncate ${act.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
@@ -244,9 +254,10 @@ export default function TripItineraryPage() {
 
             <AddActivityDialog
                 open={isAddOpen}
-                onOpenChange={setIsAddOpen}
+                onOpenChange={(open) => { setIsAddOpen(open); if (!open) setActivityToEdit(null); }}
                 tripId={tripId || ''}
-                dateId={activeDay?.id || ''}
+                dateId={activityToEdit?.dateId || activeDay?.id || ''}
+                activityToEdit={activityToEdit}
             />
 
             <AlertDialog open={!!activityToDelete} onOpenChange={() => setActivityToDelete(null)}>

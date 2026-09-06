@@ -1,6 +1,6 @@
 // src/components/trip/AddActivityDialog.tsx
-import { useState } from 'react';
-import { createActivity } from '@/services/activities';
+import { useEffect, useState } from 'react';
+import { createActivity, updateActivity } from '@/services/activities';
 import { useToast } from '@/context/ToastContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,31 +8,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlignLeft, Clock, MapPin, Sparkles } from "lucide-react";
+import type { Activity } from '@/types';
 
 interface AddActivityDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     tripId: string;
     dateId: string;
+    activityToEdit?: Activity | null;
 }
 
-export default function AddActivityDialog({ open, onOpenChange, tripId, dateId }: AddActivityDialogProps) {
+const EMPTY_FORM = { time: '', location: '', description: '' };
+
+export default function AddActivityDialog({ open, onOpenChange, tripId, dateId, activityToEdit }: AddActivityDialogProps) {
     const { showError } = useToast();
     const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        time: '',
-        location: '',
-        description: '',
-    });
+    const [formData, setFormData] = useState(EMPTY_FORM);
 
+    const isEditing = !!activityToEdit;
     const formattedDate = dateId ? dateId.split('-').reverse().join('/') : '--/--/----';
+
+    useEffect(() => {
+        if (!open) return;
+        setFormData(activityToEdit
+            ? { time: activityToEdit.time, location: activityToEdit.location, description: activityToEdit.description }
+            : EMPTY_FORM);
+    }, [open, activityToEdit]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            await createActivity({ tripId, dateId, ...formData });
-            setFormData({ time: '', location: '', description: '' });
+            if (activityToEdit) {
+                await updateActivity(activityToEdit.id, formData);
+            } else {
+                await createActivity({ tripId, dateId, ...formData });
+            }
             onOpenChange(false);
         } catch (error) {
             console.error("Erro ao salvar atividade:", error);
@@ -51,11 +62,12 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId }
                             <div className="flex items-center gap-2 mb-1">
                                 <Sparkles className="w-4 h-4 text-primary" />
                                 <DialogTitle className="text-base font-semibold text-foreground">
-                                    Adicionar atividade
+                                    {isEditing ? "Editar atividade" : "Adicionar atividade"}
                                 </DialogTitle>
                             </div>
                             <p className="text-sm text-muted-foreground">
-                                Planeje sua próxima parada para o dia <span className="text-primary font-medium">{formattedDate}</span>.
+                                {isEditing ? "Ajuste os dados dessa parada do dia " : "Planeje sua próxima parada para o dia "}
+                                <span className="text-primary font-medium">{formattedDate}</span>.
                             </p>
                         </DialogHeader>
 
@@ -105,7 +117,7 @@ export default function AddActivityDialog({ open, onOpenChange, tripId, dateId }
                             disabled={loading}
                             className="w-full h-10 rounded-lg shadow-sm"
                         >
-                            {loading ? "Salvando..." : "Adicionar ao roteiro"}
+                            {loading ? "Salvando..." : isEditing ? "Salvar alterações" : "Adicionar ao roteiro"}
                         </Button>
                     </div>
                 </form>
