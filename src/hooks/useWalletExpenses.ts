@@ -5,10 +5,11 @@ import { collection, query, where, onSnapshot, limit } from 'firebase/firestore'
 import type { Expense } from '@/types';
 
 // Todas as despesas pagas por uma lista de uids (o próprio usuário +
-// parceiros de carteira compartilhada mútua), marcadas "carteira". Filtro
-// de paidFromWallet é client-side (evita índice composto novo só pra essa
-// tela; expenses já tem índices pra paginação normal da viagem, ver
-// FIREBASE.md). `in` aceita até 10 valores — mesmo teto de useCurrencyLots.
+// parceiros de carteira compartilhada mútua) em moeda estrangeira — moeda
+// != BRL já É a demanda de carteira, sem flag separada (ver
+// AddExpenseDialog.tsx). Filtro client-side (evita índice composto novo só
+// pra essa tela; expenses já tem índices pra paginação normal da viagem,
+// ver FIREBASE.md). `in` aceita até 10 valores — mesmo teto de useCurrencyLots.
 export function useWalletExpenses(paidByUids: string[]) {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
@@ -34,7 +35,7 @@ export function useWalletExpenses(paidByUids: string[]) {
             (snapshot) => {
                 const data = snapshot.docs
                     .map((d) => ({ id: d.id, ...d.data() })) as Expense[];
-                setExpenses(data.filter((e) => e.paidFromWallet === true));
+                setExpenses(data.filter((e) => e.currency !== 'BRL'));
                 setLoading(false);
             },
             (err) => {

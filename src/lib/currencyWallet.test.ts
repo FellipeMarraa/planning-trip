@@ -28,7 +28,6 @@ function expense(overrides: Partial<Expense> = {}): Expense {
         paidBy: 'u1',
         participants: ['u1', 'u2'],
         date: '2026-06-01T20:00',
-        paidFromWallet: true,
         ...overrides,
     };
 }

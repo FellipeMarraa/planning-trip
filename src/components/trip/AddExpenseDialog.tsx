@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/common/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Check, CreditCard, Loader2, RotateCcw, Sparkles, Wallet, X, Zap } from "lucide-react";
+import { Camera, Check, Loader2, Sparkles, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { getMemberName, isGhostUid } from "@/lib/members";
+import { getMemberName } from "@/lib/members";
 import { cn } from "@/lib/utils";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currencies";
 import { EXPENSE_CATEGORIES } from "@/lib/categories";
@@ -43,38 +43,26 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
         category: 'Alimentação',
         currency: 'BRL' as CurrencyType,
         unitValue: 0,
-        spread: 0,
-        baseRate: 1, // cotação de compra, editável — congelada na despesa ao salvar
         paidBy: user?.uid || '',
         participants: trip.participants || [],
         date: nowForInput(),
         // null = sem comprovante (ou removido); string = base64 (novo ou o que já existia)
         receiptBase64: null as string | null,
-        paidFromWallet: false,
     });
 
     useEffect(() => {
         if (expenseToEdit) {
-            const isEditingBRL = expenseToEdit.currency === 'BRL';
-            const spread = isEditingBRL ? 0 : (expenseToEdit.spreadApplied || 1.6);
-            const fallbackBaseRate = expenseToEdit.exchangeRateUsed
-                ? expenseToEdit.exchangeRateUsed / (1 + spread / 100)
-                : liveRates[expenseToEdit.currency] || 1;
-
             setFormData({
                 description: expenseToEdit.description,
                 category: expenseToEdit.category,
                 currency: expenseToEdit.currency as CurrencyType,
                 unitValue: expenseToEdit.amountOriginal,
-                spread,
-                baseRate: isEditingBRL ? 1 : (expenseToEdit.baseRateAtTime || fallbackBaseRate),
                 paidBy: expenseToEdit.paidBy || user?.uid || '',
                 participants: expenseToEdit.participants?.length ? expenseToEdit.participants : (trip.participants || []),
                 // Despesa antiga sem `date` (campo só passou a ser gravado
                 // em 2026-09-02) cai no "agora" — usuário ajusta se lembrar.
                 date: expenseToEdit.date || nowForInput(),
                 receiptBase64: expenseToEdit.receiptBase64 || null,
-                paidFromWallet: expenseToEdit.paidFromWallet || false,
             });
         } else {
             setFormData({
@@ -82,13 +70,10 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 category: 'Alimentação',
                 currency: 'BRL',
                 unitValue: 0,
-                spread: 0,
-                baseRate: 1,
                 paidBy: user?.uid || '',
                 participants: trip.participants || [],
                 date: nowForInput(),
                 receiptBase64: null,
-                paidFromWallet: false,
             });
         }
     }, [expenseToEdit, open]);
@@ -125,17 +110,13 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
 
     const isBRL = formData.currency === 'BRL';
     const currentMarketRate = liveRates[formData.currency] || 1;
-    // Modo carteira: sem conversão nova acontecendo (o dinheiro já foi
-    // comprado antes) — cotação sempre de mercado, sem spread. Split/saldo
-    // continuam iguais pra todo mundo, só o pagador tem essa despesa
-    // contabilizada como "planejada" na carteira (ver /wallet).
-    // Carteira só se aplica a viagem com moeda de referência estrangeira
-    // (mesmo critério da tela /wallet, ver WalletPage.tsx) — viagem BRL não
-    // tem conceito de "comprar moeda antes", mesmo com uma despesa avulsa
-    // lançada noutra moeda.
-    const canUseWallet = !isBRL && trip.baseCurrency !== 'BRL' && (formData.paidBy === user?.uid || isGhostUid(formData.paidBy));
-    const usingWallet = canUseWallet && formData.paidFromWallet;
-    const realRate = isBRL ? 1 : usingWallet ? currentMarketRate : formData.baseRate * (1 + formData.spread / 100);
+    // Moeda != BRL é sempre "carteira de câmbio" — se você registra em
+    // EUR/GBP/etc. é porque precisa ter esse dinheiro físico no destino,
+    // nunca uma conversão nova na hora (ver lib/currencyWallet.ts,
+    // useWalletExpenses.ts filtra por currency != 'BRL'). Por isso a
+    // cotação é sempre a de mercado, sem spread editável — não existe mais
+    // "taxa de cartão/Wise escolhida na hora" separada da carteira.
+    const realRate = isBRL ? 1 : currentMarketRate;
     const totalBRL = formData.unitValue * realRate;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -150,13 +131,12 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
             amountOriginal: formData.unitValue,
             currency: formData.currency,
             exchangeRateUsed: realRate,
-            baseRateAtTime: formData.baseRate,
-            spreadApplied: formData.spread,
+            baseRateAtTime: realRate,
+            spreadApplied: 0,
             amountBRL: totalBRL,
             paidBy: formData.paidBy,
             participants: formData.participants,
             date: formData.date,
-            paidFromWallet: usingWallet,
         };
 
         try {
@@ -236,12 +216,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                 <Label className="text-sm font-medium text-muted-foreground">Moeda</Label>
                                 <Select
                                     value={formData.currency}
-                                    onValueChange={(v: CurrencyType) => setFormData({
-                                        ...formData,
-                                        currency: v,
-                                        baseRate: v === 'BRL' ? 1 : (liveRates[v] || 1),
-                                        spread: v === 'BRL' ? 0 : (formData.spread || 1.6),
-                                    })}
+                                    onValueChange={(v: CurrencyType) => setFormData({...formData, currency: v})}
                                 >
                                     <SelectTrigger className="h-10 w-full">
                                         <SelectValue />
@@ -252,6 +227,11 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {!isBRL && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Moeda estrangeira entra na sua carteira de câmbio (ver /wallet) — cotação de mercado, sem taxa de conversão.
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium text-muted-foreground">Valor ({formData.currency})</Label>
@@ -345,82 +325,12 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                             )}
                         </div>
 
-                        {canUseWallet && (
-                            <button
-                                type="button"
-                                onClick={() => setFormData({...formData, paidFromWallet: !formData.paidFromWallet})}
-                                className={cn(
-                                    "flex items-center gap-2.5 w-full p-3 rounded-xl border text-left transition-colors",
-                                    usingWallet ? "bg-primary/15 border-primary" : "bg-muted/50 border-border"
-                                )}
-                            >
-                                <div className={cn("h-5 w-5 rounded-md border flex items-center justify-center shrink-0", usingWallet ? "bg-primary border-primary" : "border-input")}>
-                                    {usingWallet && <Check className="w-3.5 h-3.5 text-primary-foreground" />}
-                                </div>
-                                <Wallet className="w-4 h-4 text-primary shrink-0" />
-                                <div className="min-w-0">
-                                    <p className="text-sm font-medium text-foreground">Marcar como carteira de câmbio</p>
-                                    <p className="text-xs text-muted-foreground">Já tenho essa moeda comprada — sem conversão nova, cotação de mercado. Ver planejamento em /wallet.</p>
-                                </div>
-                            </button>
-                        )}
-
-                        {!isBRL && !usingWallet && (
-                            <>
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-sm font-medium text-muted-foreground">Cotação de compra (R$ por {formData.currency})</Label>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({...formData, baseRate: currentMarketRate})}
-                                            className="text-xs text-primary hover:underline flex items-center gap-1"
-                                        >
-                                            <RotateCcw className="w-3 h-3" /> usar atual
-                                        </button>
-                                    </div>
-                                    <MoneyInput
-                                        className="h-10"
-                                        prefix="R$"
-                                        decimals={4}
-                                        value={formData.baseRate}
-                                        onValueChange={(v) => setFormData({...formData, baseRate: v})}
-                                        required
-                                    />
-                                    <p className="text-xs text-muted-foreground">Cotação de mercado agora: R$ {currentMarketRate.toFixed(4)}</p>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label className="text-sm font-medium text-muted-foreground">Taxa de conversão</Label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({...formData, spread: 1.6})}
-                                            className={`flex items-center justify-center gap-2 h-9 rounded-lg text-xs font-medium transition-colors border ${formData.spread === 1.6 ? 'bg-primary/15 border-primary text-primary' : 'bg-muted/50 border-border text-muted-foreground'}`}
-                                        >
-                                            <Zap className="w-3.5 h-3.5" /> Wise (1,6%)
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({...formData, spread: 6.38})}
-                                            className={`flex items-center justify-center gap-2 h-9 rounded-lg text-xs font-medium transition-colors border ${formData.spread === 6.38 ? 'bg-destructive/15 border-destructive text-destructive' : 'bg-muted/50 border-border text-muted-foreground'}`}
-                                        >
-                                            <CreditCard className="w-3.5 h-3.5" /> Cartão BR (6,38%)
-                                        </button>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
                         <div className="bg-primary/5 border border-primary/15 rounded-2xl p-5 space-y-3">
                             {!isBRL && (
                                 <div className="flex items-center justify-between border-b border-border pb-3">
                                     <div className="flex flex-col">
-                                        <span className="text-xs text-muted-foreground">Taxa final</span>
-                                        <span className="text-sm font-semibold text-primary tabular-nums">R$ {realRate.toFixed(2)}</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="text-xs text-muted-foreground">{usingWallet ? "Cotação de mercado" : "Cotação usada"}</span>
-                                        <p className="text-sm text-muted-foreground tabular-nums leading-none">R$ {(usingWallet ? currentMarketRate : formData.baseRate).toFixed(4)}</p>
+                                        <span className="text-xs text-muted-foreground">Cotação de mercado</span>
+                                        <span className="text-sm font-semibold text-primary tabular-nums">R$ {realRate.toFixed(4)}</span>
                                     </div>
                                 </div>
                             )}

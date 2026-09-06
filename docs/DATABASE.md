@@ -51,17 +51,17 @@ interface Expense {
     amountOriginal: number; currency: string; amountBRL: number;
     paidBy: string; participants: string[]; date: string;
     spreadApplied?: number; exchangeRateUsed?: number; baseRateAtTime?: number;
-    receiptBase64?: string; paidFromWallet?: boolean;
+    receiptBase64?: string;
 }
 ```
 
-Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a taxa capturada (`exchangeRateUsed`/`baseRateAtTime`/`spreadApplied`) — mesmo que `Trip.baseCurrency` sugira outra moeda de referência, o app é BRL-cêntrico por baixo.
+Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a taxa capturada (`exchangeRateUsed`/`baseRateAtTime`/`spreadApplied`) — mesmo que `Trip.baseCurrency` sugira outra moeda de referência, o app é BRL-cêntrico por baixo. Desde a simplificação da carteira de câmbio (ver 2.5), despesa não-BRL sempre usa cotação de mercado (`exchangeRateUsed == baseRateAtTime`, `spreadApplied == 0`) — não existe mais escolha manual de taxa/spread (`AddExpenseDialog.tsx`); esses 3 campos continuam existindo só por compatibilidade com despesa BRL (`exchangeRateUsed/baseRateAtTime == 1`) e despesa não-BRL criada antes dessa simplificação, que pode ter um `spreadApplied` real gravado.
 
 `date` é `yyyy-MM-ddTHH:mm` (valor cru do `<input type="datetime-local">`, `AddExpenseDialog.tsx`) — **campo existia no tipo desde sempre mas nunca era escrito** até 2026-09-02 (sem input no formulário, sem uso em `ExpenseTable.tsx`); despesas criadas antes disso não têm esse campo. Todo código que lê `date` (`allocatePayment` em `settlementAllocation.ts`, `formatDateTimeBR` em `lib/dates.ts`) trata a ausência de forma defensiva, não assume presença.
 
 `receiptBase64` é o comprovante/recibo anexado (opcional) — mesmo padrão do avatar (`lib/image.ts` `resizeReceiptToBase64`, base64 direto no Firestore, sem Firebase Storage), mas sem crop quadrado (preserva proporção) e resolução maior (precisa dar pra ler o texto). Editável junto com o resto da despesa; removível (vira `deleteField()` em `services/expenses.ts` `updateExpense`, não fica um campo `null` esquecido no doc).
 
-`paidFromWallet` (opcional, sempre explícito — `true` ou `false`, nunca ausente/`undefined`, ver `services/expenses.ts`) marca que a despesa é "prometida" à carteira de câmbio pessoal do pagador (moeda/valor = os próprios `currency`/`amountOriginal`, sem duplicar campo) — puro planejamento (ver 2.5 `currency_lots`), nunca afeta `amountBRL`/`computeTripBalances`. Só pode ser `true` quando `paidBy` é o próprio usuário logado ou um fantasma (carteira é privada).
+**Não existe campo separado marcando "despesa de carteira"** — o sinal é a própria `currency`: qualquer despesa não-BRL já é, por definição, demanda de carteira de câmbio do pagador (`useWalletExpenses.ts` filtra `currency !== 'BRL'`, ver 2.5). Achado do usuário testando: uma marcação manual separada (`paidFromWallet`, existiu numa versão anterior desta feature) era redundante — se você registra em EUR/GBP/etc. é porque precisa ter aquele dinheiro físico no destino, nunca "posso pagar em real"; a moeda escolhida já é o sinal, sem precisar de um segundo campo pra confirmar a mesma coisa.
 
 ### 2.5 `CurrencyLot`
 

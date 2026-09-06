@@ -39,17 +39,10 @@ export interface Expense {
     participants: string[]; // Uids (ou ghost_*) que dividem esta despesa
     date: string; // 'yyyy-MM-ddTHH:mm' (input datetime-local) — despesas anteriores a 2026-09-02 podem não ter esse campo, ver docs/DATABASE.md
 
-    spreadApplied?: number;      // O % de taxa aplicado (ex: 1.6)
-    exchangeRateUsed?: number;   // A taxa final com spread (ex: 5.91)
+    spreadApplied?: number;      // O % de taxa aplicado (ex: 1.6) — sempre 0 pra despesa não-BRL desde a simplificação da carteira (ver DATABASE.md 2.2)
+    exchangeRateUsed?: number;   // A taxa final (ex: 5.91) — sempre cotação de mercado pra despesa não-BRL
     baseRateAtTime?: number;
     receiptBase64?: string;      // comprovante/recibo, mesmo padrão do avatar (base64 direto, sem Firebase Storage)
-
-    // Presente só quando a despesa é "prometida" à carteira de câmbio
-    // pessoal do pagador (ver CurrencyLot abaixo) — planejamento, não
-    // consumo real: nunca afeta amountBRL/o cálculo de saldo (sempre
-    // cotação de mercado). Moeda/valor prometido são os campos que a
-    // despesa já tem (currency/amountOriginal), sem duplicar.
-    paidFromWallet?: boolean;
 }
 
 // Um lote de moeda estrangeira comprado por um participante, pra uma viagem
