@@ -40,6 +40,7 @@ export function SuggestedExpenseCard({ trip, expense }: { trip: Trip; expense: S
                 paidBy: user.uid,
                 participants: trip.participants || [],
                 date: expense.date,
+                paidFromWallet: false, // sugestão da IA é sempre BRL — carteira de câmbio não se aplica
             });
             setCreated(true);
         } catch (error) {

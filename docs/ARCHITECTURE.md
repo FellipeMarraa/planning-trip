@@ -73,6 +73,8 @@ Nenhuma dessas migrações é atômica (comentário explícito em `linkGhostToUs
 
 `react-router-dom` v7, todas as páginas lazy-loaded (`React.lazy` + um único `Suspense` em `App.tsx`) pra não puxar Recharts/Framer Motion antes da hora. `ProtectedRoute` embrulha em `Layout`, exceto a rota de itinerário (`/trip/:tripId/itinerary`), que tem layout próprio imersivo.
 
+`/wallet` (`WalletPage.tsx`) é a única rota **global** que não depende de `:tripId` na URL, mesmo mostrando dado por viagem — agrupa client-side usando `useUserTrips()`. Acessível pelo avatar do header, que virou um `DropdownMenu` (`Layout.tsx`, antes era um `Link` direto pra `/profile`) com "Perfil" e "Carteira".
+
 ## 8. Assistente de IA de viagem (`api/ai/`, `src/ai/`)
 
 Primeira vez que o planning-trip tem backend próprio (antes disso, o único código server-side que tocava este projeto era o SSO no repo do CashZ — ver seção 6). Roda inteiramente dentro do próprio projeto Firebase (`planning-trip-6a9cb`), sem cruzar com o CashZ, diferente da integração de SSO/plano.
@@ -96,6 +98,16 @@ Primeira vez que o planning-trip tem backend próprio (antes disso, o único có
 - **`DayRouteMapDialog.tsx`** (`TripItineraryPage.tsx`) é a única forma de ver esse mapa — sob demanda, via botão no cabeçalho do dia (só aparece quando há pelo menos 1 atividade com `coordinates`), painel próprio em tela cheia no mobile (mesmo padrão de `AiAssistantWidget.tsx`, ver [UI_UX.md](./UI_UX.md) seção 4.1 — é onde o uso real se concentra). **Achado real corrigido**: o mapa já foi renderizado sempre visível, inline na página — um bug de medida do Leaflet (ver próximo bullet) fazia ele às vezes desenhar cobrindo a tela inteira, tornando o roteiro e as outras atividades inacessíveis. Passou a montar só quando aberto, dentro de um painel `fixed` + `z-50` que também isola o empilhamento (contexto de stacking próprio) dos `z-index` internos do Leaflet (até 1000 em painéis/controles) — eles não competem mais com o resto da página de jeito nenhum, sob demanda ou não.
 - **Ícone padrão do Leaflet quebra com bundler** (Vite não resolve o caminho relativo que a lib usa por padrão) — corrigido uma única vez em `src/lib/leafletIcons.ts`, chamado em `main.tsx` antes de qualquer mapa renderizar.
 - **Leaflet mede o container errado dentro de layout dinâmico** (flex, animação do `framer-motion`, `Dialog`/painel ainda abrindo): o cálculo de tamanho no mount pode sair errado e o mapa desenha tiles/controles fora dos limites do próprio container. `MapAutoResize.tsx` (componente compartilhado, filho de todo `MapContainer` do projeto) resolve com `ResizeObserver` — recalcula sempre que o container muda de tamanho de verdade, mais robusto que um `setTimeout` fixo (que quebra se a animação demorar mais que o timeout escolhido).
+
+## 8.2 Carteira de câmbio (`/wallet`, `currency_lots`)
+
+Planejamento pessoal de moeda estrangeira — "quanto já comprei" vs. "quanto as despesas marcadas carteira precisam" — **não** um caixa com consumo/reserva real. Decisões de produto que moldaram o desenho (ver [DATABASE.md](./DATABASE.md) 2.5 pro modelo de dado):
+
+- **Nunca afeta a divisão de gastos**: `Expense.amountBRL` continua sempre vindo da cotação de mercado do momento — o custo real de aquisição da carteira é informação pessoal do dono, nunca muda quanto os outros participantes devem.
+- **Por viagem e por participante**, não persiste entre viagens, e só se aplica a viagens com moeda de referência estrangeira (`Trip.baseCurrency !== 'BRL'`) — viagem doméstica não tem esse conceito, mesmo que uma despesa avulsa tenha sido lançada noutra moeda (`WalletPage.tsx` filtra a lista de viagens; `AddExpenseDialog.tsx` usa o mesmo critério pra decidir se oferece o checkbox).
+- **Nunca bloqueia**: marcar uma despesa como "carteira" é permitido mesmo sem saldo comprado suficiente — o que falta vira um número visível (`shortfall` em `summarizeWalletDemand`, `src/lib/currencyWallet.ts`), nunca um erro. Por isso não existe consumo/reversão de lote — é aritmética pura recalculada a cada leitura (soma de `amountPurchased` vs. soma de `amountOriginal` das despesas marcadas), bem mais simples que a 1ª versão cogitada (FIFO com bloqueio, descartada em conversa com o usuário).
+- **Privada**: `firestore.rules` só libera leitura/escrita pro próprio `ownerUid`, ou pro owner/editor da viagem quando o dono é um fantasma (`ghost_*`). Consequência direta: `AddExpenseDialog.tsx` só oferece o checkbox de carteira quando `paidBy` é o próprio usuário logado ou um fantasma — nunca outro participante real, porque quem preenche o formulário não tem permissão de leitura da carteira alheia pra decidir se faz sentido.
+- **Tela global, não por-URL-de-viagem** (`/wallet`, `WalletPage.tsx`) — busca todos os lotes/despesas-carteira do usuário de uma vez (`useCurrencyLots`/`useWalletExpenses`, sem filtro de `tripId`) e agrupa por viagem no componente, usando `useUserTrips()` (já existia). Acessível pelo dropdown do avatar no header (`Layout.tsx`).
 
 ## 9. Convenções já validadas (siga-as)
 

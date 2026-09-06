@@ -43,6 +43,29 @@ export interface Expense {
     exchangeRateUsed?: number;   // A taxa final com spread (ex: 5.91)
     baseRateAtTime?: number;
     receiptBase64?: string;      // comprovante/recibo, mesmo padrão do avatar (base64 direto, sem Firebase Storage)
+
+    // Presente só quando a despesa é "prometida" à carteira de câmbio
+    // pessoal do pagador (ver CurrencyLot abaixo) — planejamento, não
+    // consumo real: nunca afeta amountBRL/o cálculo de saldo (sempre
+    // cotação de mercado). Moeda/valor prometido são os campos que a
+    // despesa já tem (currency/amountOriginal), sem duplicar.
+    paidFromWallet?: boolean;
+}
+
+// Um lote de moeda estrangeira comprado por um participante, pra uma viagem
+// específica (não persiste entre viagens — decisão de produto). É
+// planejamento ("quanto já comprei" vs. "quanto as despesas marcadas
+// carteira precisam"), não um caixa com consumo/reversão — ver
+// src/lib/currencyWallet.ts (summarizeWalletDemand) e ARCHITECTURE.md.
+export interface CurrencyLot {
+    id: string;
+    tripId: string;
+    ownerUid: string;        // dono do lote — uid real ou ghost_*
+    currency: string;        // mesmo CurrencyCode de lib/currencies.ts
+    amountPurchased: number; // quanto foi comprado nesse lote
+    ratePaidBRL: number;     // R$ por unidade, pago de verdade nesse lote (informativo)
+    purchaseDate: string;    // yyyy-MM-dd
+    createdAt: number;
 }
 
 // A quais cotas específicas (despesa + participante) um acerto se refere —

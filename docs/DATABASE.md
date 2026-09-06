@@ -10,6 +10,7 @@
 | `expenses` | auto | `services/expenses.ts`, migrações em `services/trips.ts` | `useTrip` (lista por `tripId`) |
 | `settlements` | auto | `services/settlements.ts`, migração em `leaveTripAsGhost` | `useSettlements` |
 | `activities` | auto | `services/activities.ts` | `useActivities` |
+| `currency_lots` | auto | `services/currencyLots.ts` | `useCurrencyLots` (só do próprio `ownerUid`, privado) |
 | `users` | uid do Firebase Auth | `upsertUserProfile` (`services/users.ts`), chamado a cada login | `useUserProfiles` |
 | `invites` | auto (o próprio ID é o token do convite) | `createInvite` (`services/invites.ts`) | `getInvite`/`joinTripByInvite` |
 | `ai_threads` | auto | só `api/ai/chat.ts` (Admin SDK) | `src/ai/hooks/useAIChat.ts` (`onSnapshot`, só a própria) |
@@ -49,7 +50,7 @@ interface Expense {
     amountOriginal: number; currency: string; amountBRL: number;
     paidBy: string; participants: string[]; date: string;
     spreadApplied?: number; exchangeRateUsed?: number; baseRateAtTime?: number;
-    receiptBase64?: string;
+    receiptBase64?: string; paidFromWallet?: boolean;
 }
 ```
 
@@ -58,6 +59,18 @@ Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a t
 `date` é `yyyy-MM-ddTHH:mm` (valor cru do `<input type="datetime-local">`, `AddExpenseDialog.tsx`) — **campo existia no tipo desde sempre mas nunca era escrito** até 2026-09-02 (sem input no formulário, sem uso em `ExpenseTable.tsx`); despesas criadas antes disso não têm esse campo. Todo código que lê `date` (`allocatePayment` em `settlementAllocation.ts`, `formatDateTimeBR` em `lib/dates.ts`) trata a ausência de forma defensiva, não assume presença.
 
 `receiptBase64` é o comprovante/recibo anexado (opcional) — mesmo padrão do avatar (`lib/image.ts` `resizeReceiptToBase64`, base64 direto no Firestore, sem Firebase Storage), mas sem crop quadrado (preserva proporção) e resolução maior (precisa dar pra ler o texto). Editável junto com o resto da despesa; removível (vira `deleteField()` em `services/expenses.ts` `updateExpense`, não fica um campo `null` esquecido no doc).
+
+`paidFromWallet` (opcional, sempre explícito — `true` ou `false`, nunca ausente/`undefined`, ver `services/expenses.ts`) marca que a despesa é "prometida" à carteira de câmbio pessoal do pagador (moeda/valor = os próprios `currency`/`amountOriginal`, sem duplicar campo) — puro planejamento (ver 2.5 `currency_lots`), nunca afeta `amountBRL`/`computeTripBalances`. Só pode ser `true` quando `paidBy` é o próprio usuário logado ou um fantasma (carteira é privada).
+
+### 2.5 `CurrencyLot`
+
+```ts
+interface CurrencyLot { id: string; tripId: string; ownerUid: string; currency: string; amountPurchased: number; ratePaidBRL: number; purchaseDate: string; createdAt: number; }
+```
+
+Registro de compra de moeda estrangeira, por viagem e por participante (não persiste entre viagens). É aritmética de planejamento, não um caixa: `src/lib/currencyWallet.ts` (`summarizeWalletDemand`) soma `amountPurchased` de todos os lotes de uma moeda vs. `amountOriginal` de todas as despesas daquela viagem com `paidFromWallet: true`, e mostra a diferença ("falta comprar X") — nada é consumido/reservado de verdade, então não existe `update` nem lógica de reversão (lote errado é apagado e recriado). `ratePaidBRL` é só informativo.
+
+**Privado**: `firestore.rules` só libera leitura/escrita pro próprio `ownerUid`, ou pro owner/editor da viagem quando `ownerUid` é um fantasma (`ghost_*`, que não tem login pra gerenciar a própria carteira). Nenhum outro participante real vê a carteira alheia — por isso a tela `/wallet` (`src/pages/WalletPage.tsx`, acessível pelo dropdown do avatar no `Layout.tsx`) só busca dados do próprio uid logado (`useCurrencyLots`/`useWalletExpenses`, sem filtro de `tripId` — global, agrupa por viagem no componente usando `useUserTrips`).
 
 ### 2.3 `Settlement`
 

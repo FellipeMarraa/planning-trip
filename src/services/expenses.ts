@@ -15,6 +15,7 @@ export interface ExpensePayload {
     paidBy: string;
     participants: string[];
     date: string;
+    paidFromWallet: boolean; // sempre explícito (nunca undefined) — planejamento de carteira de câmbio, ver lib/currencyWallet.ts
     // Ausente (chave omitida, não `undefined` — o Firestore JS SDK rejeita
     // campo com valor undefined) = sem comprovante (create) ou "não mexe no
     // que já tinha" (update). `null` só faz sentido em update: remove o

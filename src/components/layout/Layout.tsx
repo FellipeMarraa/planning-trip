@@ -2,9 +2,15 @@
 import React, { lazy, Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from "@/components/ui/button";
-import { Plane, LogOut, Settings } from "lucide-react";
+import { Plane, LogOut, Settings, User, Wallet } from "lucide-react";
 import { Link, useNavigate } from 'react-router-dom';
 import { UserAvatar } from '@/components/common/user-avatar';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Lazy: react-markdown/remark-gfm (usados só dentro do chat) não devem
 // carregar em toda página só porque o botão flutuante aparece nelas.
@@ -45,14 +51,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         <div className="h-5 w-px bg-border hidden sm:block" />
 
                         <div className="flex items-center gap-3">
-                            <Link to="/profile" className="flex items-center gap-3 group">
-                                <div className="text-right hidden md:block leading-tight">
-                                    <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{user?.displayName}</p>
-                                    <p className="text-xs text-muted-foreground">{user?.email}</p>
-                                </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex items-center gap-3 group cursor-pointer">
+                                        <div className="text-right hidden md:block leading-tight">
+                                            <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{user?.displayName}</p>
+                                            <p className="text-xs text-muted-foreground">{user?.email}</p>
+                                        </div>
 
-                                <UserAvatar photoURL={customPhotoURL || user?.photoURL} name={user?.displayName} className="size-9" />
-                            </Link>
+                                        <UserAvatar photoURL={customPhotoURL || user?.photoURL} name={user?.displayName} className="size-9" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="min-w-40">
+                                    <DropdownMenuItem onSelect={() => navigate('/profile')}>
+                                        <User className="w-4 h-4" /> Perfil
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => navigate('/wallet')}>
+                                        <Wallet className="w-4 h-4" /> Carteira
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
                             <Button
                                 variant="ghost"

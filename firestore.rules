@@ -144,6 +144,23 @@ service cloud.firestore {
       allow update, delete: if canEdit(resource.data.tripId);
     }
 
+    // Carteira de câmbio — planejamento pessoal, privado (só o próprio dono
+    // vê; owner/editor da viagem só no caso de um fantasma, que não tem
+    // login pra gerenciar a própria). Sem update: lote errado é apagado e
+    // recriado (ver services/currencyLots.ts).
+    function isGhostUid(uid) {
+      return uid.matches('ghost_.*');
+    }
+
+    match /currency_lots/{lotId} {
+      allow read: if resource.data.ownerUid == request.auth.uid
+        || (canEdit(resource.data.tripId) && isGhostUid(resource.data.ownerUid));
+      allow create: if request.resource.data.ownerUid == request.auth.uid
+        || (canEdit(request.resource.data.tripId) && isGhostUid(request.resource.data.ownerUid));
+      allow delete: if resource.data.ownerUid == request.auth.uid
+        || (canEdit(resource.data.tripId) && isGhostUid(resource.data.ownerUid));
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn();
 

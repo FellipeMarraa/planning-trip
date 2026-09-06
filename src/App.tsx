@@ -18,6 +18,7 @@ const TripDetails = lazy(() => import('@/pages/TripDetails.tsx'));
 const JoinTrip = lazy(() => import('@/pages/JoinTrip.tsx'));
 const TripItineraryPage = lazy(() => import('@/pages/TripItineraryPage.tsx'));
 const Admin = lazy(() => import('@/pages/Admin.tsx'));
+const WalletPage = lazy(() => import('@/pages/WalletPage.tsx'));
 
 const ProtectedRoute = ({ children, roleRequired }: { children: React.ReactNode, roleRequired?: 'GLOBAL' }) => {
     const { user, loading, isGlobalAdmin } = useAuth();
@@ -107,6 +108,13 @@ export default function App() {
                     <Route path="/trip/:tripId/itinerary" element={
                         <ProtectedRoute>
                             <TripItineraryPage />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* Carteira de câmbio (global, agrupada por viagem) */}
+                    <Route path="/wallet" element={
+                        <ProtectedRoute>
+                            <WalletPage />
                         </ProtectedRoute>
                     } />
 

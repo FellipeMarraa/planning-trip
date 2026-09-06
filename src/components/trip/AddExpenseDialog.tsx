@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/common/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Check, CreditCard, Loader2, RotateCcw, Sparkles, X, Zap } from "lucide-react";
+import { Camera, Check, CreditCard, Loader2, RotateCcw, Sparkles, Wallet, X, Zap } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
-import { getMemberName } from "@/lib/members";
+import { getMemberName, isGhostUid } from "@/lib/members";
 import { cn } from "@/lib/utils";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currencies";
 import { EXPENSE_CATEGORIES } from "@/lib/categories";
@@ -50,6 +50,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
         date: nowForInput(),
         // null = sem comprovante (ou removido); string = base64 (novo ou o que já existia)
         receiptBase64: null as string | null,
+        paidFromWallet: false,
     });
 
     useEffect(() => {
@@ -73,6 +74,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 // em 2026-09-02) cai no "agora" — usuário ajusta se lembrar.
                 date: expenseToEdit.date || nowForInput(),
                 receiptBase64: expenseToEdit.receiptBase64 || null,
+                paidFromWallet: expenseToEdit.paidFromWallet || false,
             });
         } else {
             setFormData({
@@ -86,6 +88,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 participants: trip.participants || [],
                 date: nowForInput(),
                 receiptBase64: null,
+                paidFromWallet: false,
             });
         }
     }, [expenseToEdit, open]);
@@ -122,7 +125,17 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
 
     const isBRL = formData.currency === 'BRL';
     const currentMarketRate = liveRates[formData.currency] || 1;
-    const realRate = isBRL ? 1 : formData.baseRate * (1 + formData.spread / 100);
+    // Modo carteira: sem conversão nova acontecendo (o dinheiro já foi
+    // comprado antes) — cotação sempre de mercado, sem spread. Split/saldo
+    // continuam iguais pra todo mundo, só o pagador tem essa despesa
+    // contabilizada como "planejada" na carteira (ver /wallet).
+    // Carteira só se aplica a viagem com moeda de referência estrangeira
+    // (mesmo critério da tela /wallet, ver WalletPage.tsx) — viagem BRL não
+    // tem conceito de "comprar moeda antes", mesmo com uma despesa avulsa
+    // lançada noutra moeda.
+    const canUseWallet = !isBRL && trip.baseCurrency !== 'BRL' && (formData.paidBy === user?.uid || isGhostUid(formData.paidBy));
+    const usingWallet = canUseWallet && formData.paidFromWallet;
+    const realRate = isBRL ? 1 : usingWallet ? currentMarketRate : formData.baseRate * (1 + formData.spread / 100);
     const totalBRL = formData.unitValue * realRate;
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -143,6 +156,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
             paidBy: formData.paidBy,
             participants: formData.participants,
             date: formData.date,
+            paidFromWallet: usingWallet,
         };
 
         try {
@@ -331,7 +345,27 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                             )}
                         </div>
 
-                        {!isBRL && (
+                        {canUseWallet && (
+                            <button
+                                type="button"
+                                onClick={() => setFormData({...formData, paidFromWallet: !formData.paidFromWallet})}
+                                className={cn(
+                                    "flex items-center gap-2.5 w-full p-3 rounded-xl border text-left transition-colors",
+                                    usingWallet ? "bg-primary/15 border-primary" : "bg-muted/50 border-border"
+                                )}
+                            >
+                                <div className={cn("h-5 w-5 rounded-md border flex items-center justify-center shrink-0", usingWallet ? "bg-primary border-primary" : "border-input")}>
+                                    {usingWallet && <Check className="w-3.5 h-3.5 text-primary-foreground" />}
+                                </div>
+                                <Wallet className="w-4 h-4 text-primary shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium text-foreground">Marcar como carteira de câmbio</p>
+                                    <p className="text-xs text-muted-foreground">Já tenho essa moeda comprada — sem conversão nova, cotação de mercado. Ver planejamento em /wallet.</p>
+                                </div>
+                            </button>
+                        )}
+
+                        {!isBRL && !usingWallet && (
                             <>
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
@@ -385,8 +419,8 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                         <span className="text-sm font-semibold text-primary tabular-nums">R$ {realRate.toFixed(2)}</span>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-xs text-muted-foreground">Cotação usada</span>
-                                        <p className="text-sm text-muted-foreground tabular-nums leading-none">R$ {formData.baseRate.toFixed(4)}</p>
+                                        <span className="text-xs text-muted-foreground">{usingWallet ? "Cotação de mercado" : "Cotação usada"}</span>
+                                        <p className="text-sm text-muted-foreground tabular-nums leading-none">R$ {(usingWallet ? currentMarketRate : formData.baseRate).toFixed(4)}</p>
                                     </div>
                                 </div>
                             )}
