@@ -21,10 +21,34 @@ const formatBRL = (value: number) =>
 
 const MEMBERS_PER_PAGE = 4;
 
+function balanceGroup(uid: string, balances: Record<string, number>): 0 | 1 | 2 {
+    const value = balances[uid] || 0;
+    if (value > 0.01) return 0;  // a receber
+    if (value < -0.01) return 1; // a pagar
+    return 2;                    // quite
+}
+
+// Ordem pedida: quem deve receber mais primeiro, depois quem deve pagar mais,
+// e só por fim quem está quite (não deve nem recebe nada). Um sort único por
+// valor bruto decrescente colocaria os "quite" no meio (entre créditos e
+// débitos) e ordenaria os devedores do menor pro maior devedor — errado nos
+// dois casos. Por isso agrupa por categoria (crédito/débito/quite) e só então
+// ordena por magnitude dentro de cada grupo. Exportado como função pura pra
+// ser testável sem infra de teste de componente (mesmo padrão de
+// computeTripBalances em useTripBalances.ts).
+export function sortParticipantsByBalance(participants: string[], balances: Record<string, number>): string[] {
+    return [...participants].sort((a, b) => {
+        const groupA = balanceGroup(a, balances);
+        const groupB = balanceGroup(b, balances);
+        if (groupA !== groupB) return groupA - groupB;
+        if (groupA === 0) return (balances[b] || 0) - (balances[a] || 0); // maior crédito primeiro
+        if (groupA === 1) return (balances[a] || 0) - (balances[b] || 0); // maior débito primeiro
+        return 0;
+    });
+}
+
 export function BalancesSummary({ trip, profiles, balances, currentUserUid, canViewAll, onSelectMember }: BalancesSummaryProps) {
-    // Quem tem mais a receber primeiro, depois quem tem mais a pagar (saldo
-    // decrescente: positivo = a receber, negativo = a pagar).
-    const participants = [...(trip.participants || [])].sort((a, b) => (balances[b] || 0) - (balances[a] || 0));
+    const participants = sortParticipantsByBalance(trip.participants || [], balances);
     const [currentPage, setCurrentPage] = useState(1);
 
     const totalPages = Math.max(1, Math.ceil(participants.length / MEMBERS_PER_PAGE));
