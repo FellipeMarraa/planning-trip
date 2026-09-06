@@ -3,6 +3,7 @@ export interface SuggestedActivity {
     time: string;
     location: string;
     description: string;
+    coordinates?: { lat: number; lng: number };
 }
 
 export interface SuggestedTrip {

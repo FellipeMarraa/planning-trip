@@ -16,6 +16,7 @@ import {
 } from "./_lib/prompt.js";
 import { generateReply } from "./_lib/providers/registry.js";
 import type { AIProviderMessage } from "./_lib/providers/types.js";
+import { geocodeSequentially } from "./_lib/geocoding.js";
 
 if (!admin.apps.length) {
     try {
@@ -47,6 +48,7 @@ interface SuggestedActivity {
     time: string;
     location: string;
     description: string;
+    coordinates?: { lat: number; lng: number };
 }
 
 // Defesa em profundidade: mesmo a IA não escrevendo nada sozinha, o texto que
@@ -69,6 +71,20 @@ function sanitizeSuggestedActivities(parsed: unknown): SuggestedActivity[] | nul
         .filter((item) => item.dateId && item.time && item.location);
 
     return sanitized.length > 0 ? sanitized : null;
+}
+
+// Enriquece cada item sugerido com coordenada real (geocoding server-side,
+// nunca confiando em lat/lng que o modelo poderia tentar inventar — ver
+// api/ai/_lib/geocoding.ts). Nome da viagem entra na busca só como
+// desambiguador de texto (ex.: "Torre Eiffel, Paris" em vez de só "Torre
+// Eiffel"), nunca é usado sozinho. Sequencial (rate limit do Nominatim) —
+// soma latência real quando há vários itens, aceito conscientemente em troca
+// de toda sugestão ganhar localização plotável no mapa do dia sem o usuário
+// precisar reeditar uma por uma depois.
+async function enrichActivitiesWithCoordinates(activities: SuggestedActivity[], tripName: string | undefined): Promise<SuggestedActivity[]> {
+    const queries = activities.map((a) => tripName ? `${a.location}, ${tripName}` : a.location);
+    const points = await geocodeSequentially(queries);
+    return activities.map((activity, i) => points[i] ? { ...activity, coordinates: points[i]! } : activity);
 }
 
 // Acha o primeiro JSON balanceado (objeto `{...}` ou array `[...]`) depois do
@@ -352,7 +368,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const extractedTrip = extractTripSuggestion(extractedActivities.reply);
             const extractedExpense = extractExpenseSuggestion(extractedTrip.reply);
             replyText = extractedExpense.reply;
-            suggestedActivities = extractedActivities.suggestedActivities;
+            suggestedActivities = extractedActivities.suggestedActivities
+                ? await enrichActivitiesWithCoordinates(extractedActivities.suggestedActivities, tripContext?.name)
+                : null;
             suggestedTrip = extractedTrip.suggestedTrip;
             suggestedExpense = extractedExpense.suggestedExpense;
             costUsd = calculateCostUsd(result.promptTokens, result.completionTokens, result.toolCalls);

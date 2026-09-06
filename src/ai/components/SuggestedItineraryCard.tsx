@@ -28,6 +28,7 @@ export function SuggestedItineraryCard({ tripId, activities }: { tripId: string;
             time: activity.time,
             location: activity.location,
             description: activity.description,
+            coordinates: activity.coordinates,
         });
     }
 

@@ -37,6 +37,7 @@ export function buildSystemPrompt(tripContext?: TripContext): string {
 - Expectativa de clima pra época do ano (baseado no seu conhecimento geral de padrões climáticos — deixe claro que não é uma previsão em tempo real, só uma expectativa histórica)
 - Estratégia de passagem aérea: quando comprar (janela de antecedência típica pra economia), qual dia da semana costuma sair mais barato, sugestão de ferramentas de comparação (Google Flights, Skyscanner, Kayak) — você NÃO tem acesso a preço real/em tempo real, então nunca invente um número específico ("R$1.200", "US$400"); dê a estratégia, não o preço.
 - O que levar na mala, considerando destino e época
+- Indicar pontos turísticos e atrações próximas ao que já está no roteiro do dia (usando seu conhecimento geral e busca na web quando precisar) — proativamente quando o usuário perguntar algo como "o que tem perto da Torre Eiffel" ou ao montar/completar o roteiro, cruzando com os locais já cadastrados no contexto abaixo
 - Analisar os gastos já registrados na viagem (quando houver contexto financeiro abaixo) e comentar padrões, exageros por categoria, sugestões de onde economizar — proativamente quando o usuário perguntar algo como "o que pode melhorar" ou "como estão meus gastos"
 - Criar a viagem, montar o roteiro, e registrar despesa — tudo quando o usuário pedir, seguindo os processos abaixo
 
@@ -103,7 +104,7 @@ ${SUGGESTION_START}
 [{"dateId":"YYYY-MM-DD","time":"HH:mm","location":"nome do local","description":"descrição curta"}]
 ${SUGGESTION_END}
 
-Só inclua esse bloco quando o usuário pedir itens concretos de roteiro pra adicionar — perguntas gerais (clima, mala, melhor época) não precisam dele.
+Só inclua esse bloco quando o usuário pedir itens concretos de roteiro pra adicionar — perguntas gerais (clima, mala, melhor época) não precisam dele. Escreva "location" de forma específica o bastante pra identificar o lugar sem ambiguidade (ex.: "Torre Eiffel" ou "Museu do Louvre", não "museu" ou "parque" genérico) — o app geocodifica esse texto automaticamente depois pra plotar no mapa do roteiro; você nunca precisa (nem deve) incluir coordenada/latitude/longitude no JSON, isso é resolvido fora do seu alcance.
 
 Se o usuário pedir pra registrar uma despesa (ex.: "gastei R$50 com um café", "adiciona um jantar de R$120"), colete descrição, valor em BRL e categoria (uma destas: ${EXPENSE_CATEGORIES.join(', ')} — escolha a mais próxima do que o usuário descreveu, não invente uma categoria fora da lista). Não precisa confirmação explícita antes de emitir o bloco (diferente de criar viagem) — a confirmação já é o card que aparece pro usuário clicar "adicionar". ADICIONE ao final da resposta:
 
