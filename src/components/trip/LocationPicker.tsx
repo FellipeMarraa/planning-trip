@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2, MapPin, Search } from "lucide-react";
+import { Loader2, MapPin, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchAddress, reverseGeocode, type AddressResult } from '@/lib/geocoding';
 import { MapAutoResize } from './MapAutoResize';
@@ -62,6 +62,10 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         setQuery('');
     };
 
+    const handleRemoveLocation = () => {
+        onChange({ location: value.location, coordinates: undefined });
+    };
+
     const handleMapPick = async (lat: number, lng: number) => {
         onChange({ location: value.location, coordinates: { lat, lng } });
         setReverseLoading(true);
@@ -105,6 +109,21 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
                     <MapPin className="w-3 h-3" /> Marcar no mapa
                 </Button>
             </div>
+
+            {value.coordinates && (
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-primary" /> Localização marcada no mapa
+                    </span>
+                    <button
+                        type="button"
+                        onClick={handleRemoveLocation}
+                        className="text-xs text-destructive hover:underline flex items-center gap-1 shrink-0"
+                    >
+                        <X className="w-3 h-3" /> Remover
+                    </button>
+                </div>
+            )}
 
             {mode === 'search' ? (
                 <div className="space-y-2">
