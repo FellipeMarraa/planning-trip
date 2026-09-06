@@ -1,22 +1,27 @@
 // src/hooks/useCurrencyLots.ts
 import { useEffect, useState } from 'react';
 import { db } from '@/config/firebase';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import type { CurrencyLot } from '@/types';
 
-// Busca os lotes de uma lista de donos de uma vez (o próprio usuário +
-// parceiros de carteira compartilhada mútua, ver lib/walletShares.ts) —
-// sem filtro de tripId, a tela /wallet é global, agrupa por viagem no
-// componente. `in` do Firestore aceita até 10 valores — sem risco real de
-// alguém compartilhar com mais de 9 pessoas.
-export function useCurrencyLots(ownerUids: string[]) {
+// Busca por tripId (não por ownerUid/`in`) — achado real: uma query
+// `where('ownerUid','in',uids)` cruzando o uid de um parceiro de carteira
+// compartilhada falha com "Missing or insufficient permissions", porque o
+// Firestore só permite uma query de lista quando o campo que ela filtra
+// corresponde a um campo que a regra de leitura realmente checa pra provar
+// a query segura sem avaliar documento por documento fora desse campo.
+// `tripId` aparece direto na regra (`canEdit(resource.data.tripId)` /
+// `hasMutualWalletShare(resource.data.tripId, ...)`), então filtrar por ele
+// sempre passa — quem é dono de cada lote é filtrado client-side depois
+// (`poolUids.includes(ownerUid)`, ver WalletPage.tsx). Sem orderBy (evita
+// índice composto novo) — ordenação por data, se precisar, é client-side.
+export function useCurrencyLots(tripId: string) {
     const [lots, setLots] = useState<CurrencyLot[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const uidsKey = [...ownerUids].sort().join(',');
 
     useEffect(() => {
-        if (ownerUids.length === 0) {
+        if (!tripId) {
             setLots([]);
             setLoading(false);
             return;
@@ -25,15 +30,15 @@ export function useCurrencyLots(ownerUids: string[]) {
         setError(null);
         const q = query(
             collection(db, 'currency_lots'),
-            where('ownerUid', 'in', ownerUids),
-            orderBy('purchaseDate', 'desc'),
-            limit(500)
+            where('tripId', '==', tripId),
+            limit(200)
         );
 
         const unsubscribe = onSnapshot(
             q,
             (snapshot) => {
                 const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as CurrencyLot[];
+                data.sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate));
                 setLots(data);
                 setLoading(false);
             },
@@ -45,8 +50,7 @@ export function useCurrencyLots(ownerUids: string[]) {
         );
 
         return () => unsubscribe();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [uidsKey]);
+    }, [tripId]);
 
     return { lots, loading, error };
 }

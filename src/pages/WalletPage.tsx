@@ -6,7 +6,7 @@ import { useToast } from '@/context/ToastContext';
 import { useUserTrips } from '@/hooks/useUserTrips';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
 import { useCurrencyLots } from '@/hooks/useCurrencyLots';
-import { useWalletExpenses } from '@/hooks/useWalletExpenses';
+import { useTrip } from '@/hooks/useTrip';
 import { useWalletShares } from '@/hooks/useWalletShares';
 import { summarizeWalletDemand } from '@/lib/currencyWallet';
 import { computeMutualPartnersByTrip } from '@/lib/walletShares';
@@ -154,6 +154,87 @@ function ShareControl({ trip, myUid, profiles, declaredByMe, declaredToMe, onDec
     );
 }
 
+// Uma seção por viagem, com seus PRÓPRIOS hooks de leitura — cada instância
+// deste componente (uma por viagem, via .map() em WalletPage) busca só os
+// dados daquela viagem. Achado real: uma query global cruzando o uid do
+// usuário + parceiro de carteira compartilhada (`where(...,'in',[...])`)
+// falhava com "Missing or insufficient permissions" — o Firestore só libera
+// uma query de lista quando o campo filtrado corresponde ao que a regra de
+// leitura verifica. `useCurrencyLots`/`useTrip` filtram por `tripId` (campo
+// que as regras de `currency_lots`/`expenses` realmente checam), sempre
+// seguro; quem é dono de cada lote/quem participa de cada despesa é
+// filtrado client-side aqui, depois da leitura.
+function TripWalletSection({ trip, poolUids, profiles, declaredByMe, declaredToMe, onDeclare, onRevoke, onOpenLotForm }: {
+    trip: Trip;
+    poolUids: string[];
+    profiles: Record<string, UserProfile>;
+    declaredByMe: Set<string>;
+    declaredToMe: Set<string>;
+    onDeclare: (toUid: string) => void;
+    onRevoke: (toUid: string) => void;
+    onOpenLotForm: () => void;
+}) {
+    const { showError } = useToast();
+    const { lots, error: lotsError } = useCurrencyLots(trip.id);
+    const { expenses, error: expensesError } = useTrip(trip.id);
+
+    useEffect(() => {
+        if (lotsError) showError(lotsError);
+    }, [lotsError, showError]);
+    useEffect(() => {
+        if (expensesError) showError(expensesError);
+    }, [expensesError, showError]);
+
+    const tripLots = useMemo(() => lots.filter((l) => poolUids.includes(l.ownerUid)), [lots, poolUids]);
+    const tripExpenses = useMemo(
+        () => expenses.filter((e) => e.currency !== 'BRL' && e.participants.some((p) => poolUids.includes(p))),
+        [expenses, poolUids]
+    );
+    const summaries = useMemo(
+        () => summarizeWalletDemand(tripLots, tripExpenses, poolUids),
+        [tripLots, tripExpenses, poolUids]
+    );
+
+    return (
+        <div className="bg-card border border-border rounded-3xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">{trip.name}</h2>
+                <Button size="sm" variant="outline" onClick={onOpenLotForm}>
+                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Registrar compra
+                </Button>
+            </div>
+
+            <ShareControl
+                trip={trip}
+                myUid={poolUids[0]}
+                profiles={profiles}
+                declaredByMe={declaredByMe}
+                declaredToMe={declaredToMe}
+                onDeclare={onDeclare}
+                onRevoke={onRevoke}
+            />
+
+            {summaries.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhuma compra registrada ainda pra essa viagem.</p>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {summaries.map((summary) => (
+                        <CurrencySummaryCard
+                            key={summary.currency}
+                            summary={summary}
+                            currency={summary.currency}
+                            lots={tripLots.filter((l) => l.currency === summary.currency)}
+                            trip={trip}
+                            profiles={profiles}
+                            onDeleteLot={(lotId) => deleteCurrencyLot(lotId).catch((error) => console.error('Erro ao remover compra de câmbio:', error))}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function WalletPage() {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -178,57 +259,12 @@ export default function WalletPage() {
         [declaredByMe, declaredToMe]
     );
 
-    // Pool de busca: eu + todo parceiro mútuo de qualquer viagem, achatado
-    // numa lista só (mesmo espírito "busca tudo de uma vez, agrupa no
-    // componente" já usado por useCurrencyLots/useWalletExpenses).
-    const fetchUids = useMemo(() => {
-        const uids = new Set<string>();
-        if (user) uids.add(user.uid);
-        Object.values(mutualPartnersByTrip).forEach((partners) => partners.forEach((uid) => uids.add(uid)));
-        return Array.from(uids);
-    }, [user, mutualPartnersByTrip]);
-
-    const { showError } = useToast();
-    const { lots, error: lotsError } = useCurrencyLots(fetchUids);
-    const { expenses, error: expensesError } = useWalletExpenses(fetchUids);
-
-    // Achado real: um erro de leitura (ex.: permissão) nesses dois hooks
-    // ficava totalmente silencioso — a tela só parecia "sem nenhuma compra
-    // registrada", sem indicar que os dados na verdade falharam ao
-    // carregar. Nunca confundir "vazio" com "erro" de novo.
-    useEffect(() => {
-        if (lotsError) showError(lotsError);
-    }, [lotsError, showError]);
-    useEffect(() => {
-        if (expensesError) showError(expensesError);
-    }, [expensesError, showError]);
-
     const allParticipantUids = useMemo(() => {
         const uids = new Set<string>();
         nonBrlTrips.forEach((t) => (t.participants || []).forEach((uid) => { if (!isGhostUid(uid)) uids.add(uid); }));
         return Array.from(uids);
     }, [nonBrlTrips]);
     const { profiles } = useUserProfiles(allParticipantUids);
-
-    const tripSections = useMemo(() => {
-        return nonBrlTrips.map((trip) => {
-            const partners = mutualPartnersByTrip[trip.id] || [];
-            const poolUids = user ? [user.uid, ...partners] : partners;
-
-            const tripLots = lots.filter((l) => l.tripId === trip.id && poolUids.includes(l.ownerUid));
-            const tripExpenses = expenses.filter((e) => e.tripId === trip.id && e.participants.some((p) => poolUids.includes(p)));
-            const summaries = summarizeWalletDemand(tripLots, tripExpenses, poolUids);
-            return { trip, tripLots, summaries };
-        });
-    }, [nonBrlTrips, mutualPartnersByTrip, lots, expenses, user]);
-
-    const handleDeleteLot = async (lotId: string) => {
-        try {
-            await deleteCurrencyLot(lotId);
-        } catch (error) {
-            console.error('Erro ao remover compra de câmbio:', error);
-        }
-    };
 
     const handleDeclare = async (tripId: string, toUid: string) => {
         if (!user) return;
@@ -252,7 +288,7 @@ export default function WalletPage() {
     // return antes de chamar hook quebraria as Rules of Hooks). Enquanto
     // carrega ou não há viagem em moeda estrangeira, o efeito acima já
     // redireciona pra "/" — aqui só evita desenhar a página por um instante.
-    if (tripsLoading || nonBrlTrips.length === 0) return <PageLoader />;
+    if (tripsLoading || nonBrlTrips.length === 0 || !user) return <PageLoader />;
 
     return (
         <div className="max-w-3xl mx-auto space-y-6">
@@ -265,61 +301,34 @@ export default function WalletPage() {
                 </p>
             </div>
 
-            {tripSections.map(({ trip, tripLots, summaries }) => {
-                    const declaredByMeSet = new Set(declaredByMe.filter((d) => d.tripId === trip.id).map((d) => d.toUid));
-                    const declaredToMeSet = new Set(declaredToMe.filter((d) => d.tripId === trip.id).map((d) => d.fromUid));
+            {nonBrlTrips.map((trip) => {
+                const partners = mutualPartnersByTrip[trip.id] || [];
+                const poolUids = [user.uid, ...partners];
+                const declaredByMeSet = new Set(declaredByMe.filter((d) => d.tripId === trip.id).map((d) => d.toUid));
+                const declaredToMeSet = new Set(declaredToMe.filter((d) => d.tripId === trip.id).map((d) => d.fromUid));
 
-                    return (
-                        <div key={trip.id} className="bg-card border border-border rounded-3xl p-5 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-sm font-semibold text-foreground">{trip.name}</h2>
-                                <Button size="sm" variant="outline" onClick={() => setLotFormTripId(trip.id)}>
-                                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Registrar compra
-                                </Button>
-                            </div>
+                return (
+                    <TripWalletSection
+                        key={trip.id}
+                        trip={trip}
+                        poolUids={poolUids}
+                        profiles={profiles}
+                        declaredByMe={declaredByMeSet}
+                        declaredToMe={declaredToMeSet}
+                        onDeclare={(toUid) => handleDeclare(trip.id, toUid)}
+                        onRevoke={(toUid) => handleRevoke(trip.id, toUid)}
+                        onOpenLotForm={() => setLotFormTripId(trip.id)}
+                    />
+                );
+            })}
 
-                            {user && (
-                                <ShareControl
-                                    trip={trip}
-                                    myUid={user.uid}
-                                    profiles={profiles}
-                                    declaredByMe={declaredByMeSet}
-                                    declaredToMe={declaredToMeSet}
-                                    onDeclare={(toUid) => handleDeclare(trip.id, toUid)}
-                                    onRevoke={(toUid) => handleRevoke(trip.id, toUid)}
-                                />
-                            )}
-
-                            {summaries.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">Nenhuma compra registrada ainda pra essa viagem.</p>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {summaries.map((summary) => (
-                                        <CurrencySummaryCard
-                                            key={summary.currency}
-                                            summary={summary}
-                                            currency={summary.currency}
-                                            lots={tripLots.filter((l) => l.currency === summary.currency)}
-                                            trip={trip}
-                                            profiles={profiles}
-                                            onDeleteLot={handleDeleteLot}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-
-            {user && (
-                <CurrencyLotForm
-                    open={!!lotFormTripId}
-                    onOpenChange={(open) => !open && setLotFormTripId(null)}
-                    tripId={lotFormTripId || ''}
-                    ownerUid={user.uid}
-                    ownerLabel="você"
-                />
-            )}
+            <CurrencyLotForm
+                open={!!lotFormTripId}
+                onOpenChange={(open) => !open && setLotFormTripId(null)}
+                tripId={lotFormTripId || ''}
+                ownerUid={user.uid}
+                ownerLabel="você"
+            />
         </div>
     );
 }

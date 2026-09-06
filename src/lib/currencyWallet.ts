@@ -31,8 +31,10 @@ function participantShare(expense: Expense): number {
 // em mãos a própria cota em moeda local, independente de quem pagou. Uma
 // despesa de €750 dividida em 3 conta €250 se só 1 membro do pool participa
 // dela, ou €500 se 2 membros do pool participam. `walletExpenses` já vem
-// filtrado pelo chamador (useWalletExpenses: participants array-contains-any
-// poolUids) — pode conter despesa onde nem todo mundo do pool participa.
+// filtrado pelo chamador pra moeda != BRL (ver WalletPage.tsx — busca por
+// tripId via useTrip, nunca por participants/paidBy diretamente: uma query
+// cruzando uid de terceiro nesse campo é rejeitada pelo Firestore, ver
+// firestore.rules) — pode conter despesa onde nem todo mundo do pool participa.
 export function summarizeWalletDemand(lots: CurrencyLot[], walletExpenses: Expense[], poolUids: string[]): WalletCurrencySummary[] {
     const currencies = new Set([...lots.map((l) => l.currency), ...walletExpenses.map((e) => e.currency)]);
 
