@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTrip } from '@/hooks/useTrip';
 import { useActivities } from '@/hooks/useActivities';
@@ -56,6 +56,7 @@ export default function TripItineraryPage() {
                     date,
                     label: format(date, "dd 'de' MMMM", { locale: ptBR }),
                     weekDay: format(date, "EEEE", { locale: ptBR }),
+                    weekDayShort: format(date, "EEE", { locale: ptBR }).replace('.', ''),
                     dayNumber: i + 1
                 };
             });
@@ -66,6 +67,16 @@ export default function TripItineraryPage() {
 
     const activeDay = tripDays[currentStep];
     const dayActivities = activities.filter(a => a.dateId === activeDay?.id);
+
+    // Com muitos dias a tira de dias transborda (overflow-x-auto) — trocar de
+    // dia pelos botões Anterior/Próximo mudava currentStep mas nunca rolava a
+    // tira, então o dia ativo saía da área visível e parecia que nada estava
+    // selecionado. Rola o botão do dia ativo pro centro sempre que ele muda.
+    const dayButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+    useEffect(() => {
+        if (!activeDay) return;
+        dayButtonRefs.current[activeDay.id]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }, [activeDay]);
 
     const handleToggleComplete = async (id: string, currentStatus: boolean) => {
         await toggleActivityComplete(id, currentStatus);
@@ -130,9 +141,11 @@ export default function TripItineraryPage() {
                         {tripDays.map((day, idx) => (
                             <button
                                 key={day.id}
+                                ref={(el) => { dayButtonRefs.current[day.id] = el; }}
                                 onClick={() => setCurrentStep(idx)}
-                                className={`flex-shrink-0 flex flex-col items-center gap-2 transition-all duration-300 ${currentStep === idx ? 'scale-105' : 'opacity-40 hover:opacity-60'}`}
+                                className={`flex-shrink-0 flex flex-col items-center gap-1.5 transition-all duration-300 ${currentStep === idx ? 'scale-105' : 'opacity-40 hover:opacity-60'}`}
                             >
+                                <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{day.weekDayShort}</span>
                                 <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center text-xs font-semibold transition-colors ${currentStep === idx ? 'bg-primary border-primary text-primary-foreground shadow-sm' : 'bg-muted border-border text-muted-foreground'}`}>
                                     {day.dayNumber}
                                 </div>
