@@ -4,24 +4,27 @@ import { db } from '@/config/firebase';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
 import type { CurrencyLot } from '@/types';
 
-// Busca por tripId (não por ownerUid/`in`) — achado real: uma query
-// `where('ownerUid','in',uids)` cruzando o uid de um parceiro de carteira
-// compartilhada falha com "Missing or insufficient permissions", porque o
-// Firestore só permite uma query de lista quando o campo que ela filtra
-// corresponde a um campo que a regra de leitura realmente checa pra provar
-// a query segura sem avaliar documento por documento fora desse campo.
-// `tripId` aparece direto na regra (`canEdit(resource.data.tripId)` /
-// `hasMutualWalletShare(resource.data.tripId, ...)`), então filtrar por ele
-// sempre passa — quem é dono de cada lote é filtrado client-side depois
-// (`poolUids.includes(ownerUid)`, ver WalletPage.tsx). Sem orderBy (evita
-// índice composto novo) — ordenação por data, se precisar, é client-side.
-export function useCurrencyLots(tripId: string) {
+// Precisa filtrar por tripId E por ownerUid juntos — nenhum dos dois sozinho
+// prova a regra de leitura pro Firestore (achado real, 2 rodadas de bug):
+// a regra de `currency_lots` é um OR que depende tanto de `tripId` quanto de
+// `ownerUid` (`ownerUid == auth.uid` OU `hasMutualWalletShare(tripId, auth.uid,
+// ownerUid)`, ver firestore.rules) — numa query de lista, o Firestore só
+// libera se conseguir provar a regra pro "conjunto potencial de resultados"
+// da query, não documento por documento com dado real. Filtrar só por tripId
+// deixa `ownerUid` livre (poderia ser de qualquer outro participante da
+// viagem, que a regra reprova) — nega tudo. Filtrar só por ownerUid (`in`)
+// deixa `tripId` livre (poderia ser de qualquer viagem em que o dono tem
+// lote) — nega tudo. Os dois juntos restringem o resultado potencial ao
+// conjunto exato (esta viagem, só donos do pool) que a regra sabe validar.
+// `ownerUid in poolUids` tem o limite de 10 valores do Firestore — pool de
+// carteira compartilhada (dono + parceiros mútuos) não passa disso na prática.
+export function useCurrencyLots(tripId: string, poolUids: string[]) {
     const [lots, setLots] = useState<CurrencyLot[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!tripId) {
+        if (!tripId || poolUids.length === 0) {
             setLots([]);
             setLoading(false);
             return;
@@ -31,6 +34,7 @@ export function useCurrencyLots(tripId: string) {
         const q = query(
             collection(db, 'currency_lots'),
             where('tripId', '==', tripId),
+            where('ownerUid', 'in', poolUids),
             limit(200)
         );
 
@@ -50,7 +54,8 @@ export function useCurrencyLots(tripId: string) {
         );
 
         return () => unsubscribe();
-    }, [tripId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tripId, poolUids.join(',')]);
 
     return { lots, loading, error };
 }

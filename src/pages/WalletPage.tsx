@@ -175,7 +175,7 @@ function TripWalletSection({ trip, poolUids, profiles, declaredByMe, declaredToM
     onOpenLotForm: () => void;
 }) {
     const { showError } = useToast();
-    const { lots, error: lotsError } = useCurrencyLots(trip.id);
+    const { lots, error: lotsError } = useCurrencyLots(trip.id, poolUids);
     const { expenses, error: expensesError } = useTrip(trip.id);
 
     useEffect(() => {
