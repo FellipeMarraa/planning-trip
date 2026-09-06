@@ -10,7 +10,8 @@
 | `expenses` | auto | `services/expenses.ts`, migrações em `services/trips.ts` | `useTrip` (lista por `tripId`) |
 | `settlements` | auto | `services/settlements.ts`, migração em `leaveTripAsGhost` | `useSettlements` |
 | `activities` | auto | `services/activities.ts` | `useActivities` |
-| `currency_lots` | auto | `services/currencyLots.ts` | `useCurrencyLots` (só do próprio `ownerUid`, privado) |
+| `currency_lots` | auto | `services/currencyLots.ts` | `useCurrencyLots` (próprio `ownerUid` + parceiros de compartilhamento mútuo, privado do resto) |
+| `wallet_shares` | determinístico (`${tripId}_${fromUid}_${toUid}`) | `services/walletShares.ts` | `useWalletShares` (só declarações que envolvem o próprio uid) |
 | `users` | uid do Firebase Auth | `upsertUserProfile` (`services/users.ts`), chamado a cada login | `useUserProfiles` |
 | `invites` | auto (o próprio ID é o token do convite) | `createInvite` (`services/invites.ts`) | `getInvite`/`joinTripByInvite` |
 | `ai_threads` | auto | só `api/ai/chat.ts` (Admin SDK) | `src/ai/hooks/useAIChat.ts` (`onSnapshot`, só a própria) |
@@ -70,7 +71,15 @@ interface CurrencyLot { id: string; tripId: string; ownerUid: string; currency: 
 
 Registro de compra de moeda estrangeira, por viagem e por participante (não persiste entre viagens). É aritmética de planejamento, não um caixa: `src/lib/currencyWallet.ts` (`summarizeWalletDemand`) soma `amountPurchased` de todos os lotes de uma moeda vs. `amountOriginal` de todas as despesas daquela viagem com `paidFromWallet: true`, e mostra a diferença ("falta comprar X") — nada é consumido/reservado de verdade, então não existe `update` nem lógica de reversão (lote errado é apagado e recriado). `ratePaidBRL` é só informativo.
 
-**Privado**: `firestore.rules` só libera leitura/escrita pro próprio `ownerUid`, ou pro owner/editor da viagem quando `ownerUid` é um fantasma (`ghost_*`, que não tem login pra gerenciar a própria carteira). Nenhum outro participante real vê a carteira alheia — por isso a tela `/wallet` (`src/pages/WalletPage.tsx`, acessível pelo dropdown do avatar no `Layout.tsx`) só busca dados do próprio uid logado (`useCurrencyLots`/`useWalletExpenses`, sem filtro de `tripId` — global, agrupa por viagem no componente usando `useUserTrips`).
+**Privado por padrão**: `firestore.rules` só libera leitura/escrita pro próprio `ownerUid`, ou pro owner/editor da viagem quando `ownerUid` é um fantasma (`ghost_*`, que não tem login pra gerenciar a própria carteira) — **ou** quando existe compartilhamento mútuo ativo (ver 2.6 `wallet_shares`). A tela `/wallet` (`src/pages/WalletPage.tsx`, acessível pelo dropdown do avatar no `Layout.tsx`) busca lotes/despesas-carteira de `[o próprio uid, ...parceiros mútuos de cada viagem]` (`useCurrencyLots`/`useWalletExpenses`, sem filtro de `tripId` — global, agrupa por viagem no componente usando `useUserTrips`).
+
+### 2.6 `WalletShareDeclaration` (coleção `wallet_shares`, doc ID determinístico)
+
+```ts
+interface WalletShareDeclaration { id: string; tripId: string; fromUid: string; toUid: string; createdAt: number; }
+```
+
+Declaração **unilateral** de "quero juntar minha carteira com a de X, nessa viagem" — caso de uso real: casal viajando junto, dinheiro unificado (ela tem €250, ele tem €250, juntos validam contra €500 de necessidade, mesmo a divisão de despesa continuando igual pros dois). Doc ID = `${tripId}_${fromUid}_${toUid}` (nunca auto-ID) — permite a regra do Firestore checar existência via `exists()` direto por caminho, sem query. **Mútuo** (pool ativo, libera leitura cruzada de `currency_lots`) só quando existem os dois sentidos (`A_B` e `B_A`) pro mesmo `tripId` — uma declaração sozinha não expõe nada, `src/lib/walletShares.ts` (`computeMutualPartnersByTrip`) calcula isso client-side a partir de dois listeners (`useWalletShares.ts`, um `where('fromUid','==',uid)` e outro `where('toUid','==',uid)` — Firestore não faz OR entre campos numa query só). Sem `update` — revogar (apagar) e declarar de novo, se precisar mudar algo. Não se aplica a fantasma (sem login, não tem como declarar a própria metade).
 
 ### 2.3 `Settlement`
 

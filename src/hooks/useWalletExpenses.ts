@@ -2,26 +2,30 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/config/firebase';
 import { collection, query, where, onSnapshot, limit } from 'firebase/firestore';
-import { useAuth } from '@/context/AuthContext';
 import type { Expense } from '@/types';
 
-// Todas as despesas pagas pelo usuário, marcadas "carteira" — filtro de
-// paidFromWallet é client-side (evita índice composto novo só pra essa
+// Todas as despesas pagas por uma lista de uids (o próprio usuário +
+// parceiros de carteira compartilhada mútua), marcadas "carteira". Filtro
+// de paidFromWallet é client-side (evita índice composto novo só pra essa
 // tela; expenses já tem índices pra paginação normal da viagem, ver
-// FIREBASE.md). limit(500) como teto de segurança, mesmo padrão do resto.
-export function useWalletExpenses() {
-    const { user } = useAuth();
+// FIREBASE.md). `in` aceita até 10 valores — mesmo teto de useCurrencyLots.
+export function useWalletExpenses(paidByUids: string[]) {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const uidsKey = [...paidByUids].sort().join(',');
 
     useEffect(() => {
-        if (!user) return;
+        if (paidByUids.length === 0) {
+            setExpenses([]);
+            setLoading(false);
+            return;
+        }
 
         setError(null);
         const q = query(
             collection(db, 'expenses'),
-            where('paidBy', '==', user.uid),
+            where('paidBy', 'in', paidByUids),
             limit(500)
         );
 
@@ -41,7 +45,8 @@ export function useWalletExpenses() {
         );
 
         return () => unsubscribe();
-    }, [user]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uidsKey]);
 
     return { expenses, loading, error };
 }

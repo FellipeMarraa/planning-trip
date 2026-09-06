@@ -68,6 +68,18 @@ export interface CurrencyLot {
     createdAt: number;
 }
 
+// Declaração unilateral de "quero juntar minha carteira com a de X, nessa
+// viagem". Doc ID determinístico (`${tripId}_${fromUid}_${toUid}`, ver
+// services/walletShares.ts) — mútuo (pool ativo) só quando existem os dois
+// sentidos (A→B e B→A) pro mesmo tripId, ver src/lib/walletShares.ts.
+export interface WalletShareDeclaration {
+    id: string; // == `${tripId}_${fromUid}_${toUid}`
+    tripId: string;
+    fromUid: string;
+    toUid: string;
+    createdAt: number;
+}
+
 // A quais cotas específicas (despesa + participante) um acerto se refere —
 // metadado de exibição só, nunca usado no cálculo do saldo total
 // (computeTripBalances/firestore.rules continuam usando só Settlement.amount,

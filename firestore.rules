@@ -152,13 +152,35 @@ service cloud.firestore {
       return uid.matches('ghost_.*');
     }
 
+    // Compartilhamento mútuo de carteira (casal viajando junto, dinheiro
+    // unificado) — declaração unilateral (wallet_shares), só vira "mútuo"
+    // (libera leitura cruzada) quando existem os dois sentidos pro mesmo
+    // tripId. Doc ID determinístico (`${tripId}_${fromUid}_${toUid}`) pra
+    // exists() ser barato — nunca uma query dentro da regra.
+    function walletShareDocId(tripId, fromUid, toUid) {
+      return tripId + '_' + fromUid + '_' + toUid;
+    }
+    function hasMutualWalletShare(tripId, uidA, uidB) {
+      return exists(/databases/$(database)/documents/wallet_shares/$(walletShareDocId(tripId, uidA, uidB)))
+          && exists(/databases/$(database)/documents/wallet_shares/$(walletShareDocId(tripId, uidB, uidA)));
+    }
+
     match /currency_lots/{lotId} {
       allow read: if resource.data.ownerUid == request.auth.uid
-        || (canEdit(resource.data.tripId) && isGhostUid(resource.data.ownerUid));
+        || (canEdit(resource.data.tripId) && isGhostUid(resource.data.ownerUid))
+        || hasMutualWalletShare(resource.data.tripId, request.auth.uid, resource.data.ownerUid);
       allow create: if request.resource.data.ownerUid == request.auth.uid
         || (canEdit(request.resource.data.tripId) && isGhostUid(request.resource.data.ownerUid));
       allow delete: if resource.data.ownerUid == request.auth.uid
         || (canEdit(resource.data.tripId) && isGhostUid(resource.data.ownerUid));
+    }
+
+    match /wallet_shares/{shareId} {
+      allow read: if resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid;
+      allow create: if request.resource.data.fromUid == request.auth.uid
+        && isParticipant(request.resource.data.tripId)
+        && request.resource.data.toUid in tripData(request.resource.data.tripId).participants;
+      allow delete: if resource.data.fromUid == request.auth.uid;
     }
 
     match /users/{uid} {

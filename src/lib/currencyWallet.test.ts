@@ -46,7 +46,25 @@ describe('summarizeWalletDemand', () => {
             totalNeeded: 50,
             shortfall: 0,
             items: [{ expenseId: 'exp1', description: 'Jantar', amountNeeded: 50 }],
+            purchasedByOwner: [{ ownerUid: 'u1', amount: 100 }],
         }]);
+    });
+
+    it('carteira compartilhada: soma comprado por dono separadamente (breakdown)', () => {
+        const result = summarizeWalletDemand([
+            lot({ id: 'meu', ownerUid: 'marido', amountPurchased: 250 }),
+            lot({ id: 'dela', ownerUid: 'esposa', amountPurchased: 250 }),
+        ], [expense({ amountOriginal: 300 })]);
+
+        expect(result[0].totalPurchased).toBe(500);
+        expect(result[0].shortfall).toBe(0);
+        expect(result[0].purchasedByOwner).toEqual(
+            expect.arrayContaining([
+                { ownerUid: 'marido', amount: 250 },
+                { ownerUid: 'esposa', amount: 250 },
+            ])
+        );
+        expect(result[0].purchasedByOwner).toHaveLength(2);
     });
 
     it('comprado não cobre: shortfall = necessário - comprado', () => {
@@ -87,6 +105,6 @@ describe('summarizeWalletDemand', () => {
 
     it('moeda só com lote (sem despesa carteira) aparece com necessário zero', () => {
         const result = summarizeWalletDemand([lot({ currency: 'GBP', amountPurchased: 30 })], []);
-        expect(result).toEqual([{ currency: 'GBP', totalPurchased: 30, totalNeeded: 0, shortfall: 0, items: [] }]);
+        expect(result).toEqual([{ currency: 'GBP', totalPurchased: 30, totalNeeded: 0, shortfall: 0, items: [], purchasedByOwner: [{ ownerUid: 'u1', amount: 30 }] }]);
     });
 });

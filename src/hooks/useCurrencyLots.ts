@@ -2,25 +2,30 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/config/firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
-import { useAuth } from '@/context/AuthContext';
 import type { CurrencyLot } from '@/types';
 
-// Busca TODOS os lotes do usuário de uma vez (sem filtro de tripId) — a
-// tela /wallet é global, agrupa por viagem no componente. Mesmo espírito
-// de useUserTrips.ts (where + limit como teto de segurança).
-export function useCurrencyLots() {
-    const { user } = useAuth();
+// Busca os lotes de uma lista de donos de uma vez (o próprio usuário +
+// parceiros de carteira compartilhada mútua, ver lib/walletShares.ts) —
+// sem filtro de tripId, a tela /wallet é global, agrupa por viagem no
+// componente. `in` do Firestore aceita até 10 valores — sem risco real de
+// alguém compartilhar com mais de 9 pessoas.
+export function useCurrencyLots(ownerUids: string[]) {
     const [lots, setLots] = useState<CurrencyLot[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const uidsKey = [...ownerUids].sort().join(',');
 
     useEffect(() => {
-        if (!user) return;
+        if (ownerUids.length === 0) {
+            setLots([]);
+            setLoading(false);
+            return;
+        }
 
         setError(null);
         const q = query(
             collection(db, 'currency_lots'),
-            where('ownerUid', '==', user.uid),
+            where('ownerUid', 'in', ownerUids),
             orderBy('purchaseDate', 'desc'),
             limit(500)
         );
@@ -40,7 +45,8 @@ export function useCurrencyLots() {
         );
 
         return () => unsubscribe();
-    }, [user]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uidsKey]);
 
     return { lots, loading, error };
 }
