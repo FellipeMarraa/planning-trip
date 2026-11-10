@@ -53,6 +53,7 @@ interface Expense {
     spreadApplied?: number; exchangeRateUsed?: number; baseRateAtTime?: number;
     receiptBase64?: string;
     purchased?: boolean;
+    bookingRef?: string;
 }
 ```
 
@@ -63,6 +64,10 @@ Toda despesa é normalizada pra BRL no momento da escrita (`amountBRL`), com a t
 `receiptBase64` é o comprovante/recibo anexado (opcional) — mesmo padrão do avatar (`lib/image.ts` `resizeReceiptToBase64`, base64 direto no Firestore, sem Firebase Storage), mas sem crop quadrado (preserva proporção) e resolução maior (precisa dar pra ler o texto). Editável junto com o resto da despesa; removível (vira `deleteField()` em `services/expenses.ts` `updateExpense`, não fica um campo `null` esquecido no doc).
 
 `purchased` marca se a despesa já foi **comprada/reservada de fato** (`true`) ou se ainda é só **orçamento** (ausente/`false`, exibido como "Pendente"). Decisão de produto: o usuário lança primeiro uma estimativa e, quando compra de verdade, marca como comprado e atualiza o valor — por isso o padrão é pendente e **despesa sem o campo (anterior a essa feature, ou criada pelo card de sugestão da IA, que não o envia) conta como pendente**, nunca como comprada (erro inofensivo vs. achar que já reservou). **É informativo**: não entra em `computeTripBalances`, divisão, acertos nem carteira de câmbio — saldos continuam calculados sobre todas as despesas, comprada ou não. Lógica pura em `src/lib/purchaseStatus.ts` (`isPurchased`, `matchesPurchaseFilter`, `summarizePurchases`); toggle de 1 toque via `setExpensePurchased` (`services/expenses.ts`), que só escreve `purchased`/`updatedAt`. `firestore.rules` não precisou mudar: o `update` já é `canEdit`, e a regra de "sair da viagem" restringe só `paidBy`/`participants`. Se um dia pendente passar a não gerar dívida, é uma mudança separada no modelo de saldo.
+
+**Confirmar compra** (`ConfirmPurchaseDialog.tsx`): marcar uma despesa *pendente* como comprada abre um passo com o **valor real** (já preenchido com a estimativa — confirmar sem mexer funciona) e o **código/link da reserva** (`bookingRef`, opcional), gravados juntos por `confirmExpensePurchase` (`services/expenses.ts`, uma única escrita). Só se o valor mudou é que `amountOriginal`/`amountBRL`/`exchangeRateUsed`/`baseRateAtTime` são regravados (`buildPurchaseValueUpdate`, `lib/purchaseStatus.ts`) — com a mesma regra do `AddExpenseDialog` ao editar: despesa não-BRL usa a cotação de mercado do momento, sem spread; sem cotação disponível, reaproveita a taxa da própria despesa (nunca assume 1). Valor igual = cotação histórica intacta. Desmarcar (comprado → pendente) continua em 1 toque e não mexe em valor nem referência.
+
+`bookingRef` é texto livre (máx. 300 caracteres, `BOOKING_REF_MAX_LENGTH`) editável também no `AddExpenseDialog`. Vazio = campo removido de verdade (`deleteField()`, mesma convenção do comprovante). Na lista (`ExpenseTable.tsx`) só vira link clicável se for **http(s)** (`parseBookingRef`, `lib/bookingRef.ts`, `rel="noopener noreferrer"`); qualquer outra coisa — código de confirmação, `javascript:`, `data:` — é exibida como texto puro.
 
 **Não existe campo separado marcando "despesa de carteira"** — o sinal é a própria `currency`: qualquer despesa não-BRL já é, por definição, demanda de carteira de câmbio do pagador (`WalletPage.tsx`/`TripWalletSection` reaproveita `useTrip(tripId)` e filtra `currency !== 'BRL'` client-side, ver 2.5). Achado do usuário testando: uma marcação manual separada (`paidFromWallet`, existiu numa versão anterior desta feature) era redundante — se você registra em EUR/GBP/etc. é porque precisa ter aquele dinheiro físico no destino, nunca "posso pagar em real"; a moeda escolhida já é o sinal, sem precisar de um segundo campo pra confirmar a mesma coisa.
 

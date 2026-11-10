@@ -19,7 +19,7 @@ Grupos pequenos (família, amigos) organizando uma viagem junto, tipicamente com
 | Membros sem conta | "Ghost member" — participante sem login, pode ser vinculado a um usuário real depois |
 | Despesas | Criar/editar/apagar, moeda original + conversão pra BRL, categoria, quem pagou, quem divide |
 | Acertos | Registro de pagamento de dívida entre dois participantes (sempre em BRL) |
-| Status de compra | Cada despesa é "Pendente" (só orçamento) ou "Comprada" (check de 1 toque na lista), com filtro `Todas/Pendentes/Compradas` e card de progresso ("X de Y comprados", valor comprado vs. pendente) — informativo, não altera saldos |
+| Status de compra | Cada despesa é "Pendente" (só orçamento) ou "Comprada" (check de 1 toque na lista), com filtro `Todas/Pendentes/Compradas`, card de progresso ("X de Y comprados", valor comprado vs. pendente) e passo "Confirmar compra" (valor real + código/link da reserva) ao marcar — informativo, não altera a divisão de saldos |
 | Itinerário | Atividades por dia (horário, local, descrição, concluído/não) — página com layout próprio (dark mode imersivo) |
 | Análise | Gráfico de gasto por categoria (Recharts), resumo de saldo por membro |
 | Cotação | Busca de câmbio ao vivo (AwesomeAPI) com fallback fixo se a API falhar |

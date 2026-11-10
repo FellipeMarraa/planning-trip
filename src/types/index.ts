@@ -47,6 +47,9 @@ export interface Expense {
     // (valor estimado). Informativo: não altera saldos nem divisão — ver
     // src/lib/purchaseStatus.ts e docs/DATABASE.md 2.2.
     purchased?: boolean;
+    // Código de confirmação ou link da reserva (texto livre, opcional). Só vira
+    // link clicável se for http(s) — ver src/lib/bookingRef.ts.
+    bookingRef?: string;
 }
 
 // Um lote de moeda estrangeira comprado por um participante, pra uma viagem

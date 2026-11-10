@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isPurchased, matchesPurchaseFilter, summarizePurchases } from './purchaseStatus';
+import { buildPurchaseValueUpdate, isPurchased, matchesPurchaseFilter, summarizePurchases } from './purchaseStatus';
 
 describe('isPurchased', () => {
     it('só true explícito conta como comprado', () => {
@@ -69,5 +69,46 @@ describe('summarizePurchases', () => {
 
     it('tudo comprado = 100%', () => {
         expect(summarizePurchases([{ purchased: true, amountBRL: 10 }]).percentPurchased).toBe(100);
+    });
+});
+
+describe('buildPurchaseValueUpdate', () => {
+    const brl = { amountOriginal: 3000, amountBRL: 3000, currency: 'BRL', exchangeRateUsed: 1 };
+    const eur = { amountOriginal: 500, amountBRL: 3000, currency: 'EUR', exchangeRateUsed: 6 };
+
+    it('valor igual (ou inválido) = null, preserva a cotação histórica', () => {
+        expect(buildPurchaseValueUpdate(brl, 3000, undefined)).toBeNull();
+        expect(buildPurchaseValueUpdate(eur, 500, 6.5)).toBeNull();
+        expect(buildPurchaseValueUpdate(brl, 0, undefined)).toBeNull();
+        expect(buildPurchaseValueUpdate(brl, NaN, undefined)).toBeNull();
+    });
+
+    it('BRL: amountBRL = novo valor, taxa 1', () => {
+        expect(buildPurchaseValueUpdate(brl, 3450.5, 99)).toEqual({
+            amountOriginal: 3450.5,
+            amountBRL: 3450.5,
+            exchangeRateUsed: 1,
+            baseRateAtTime: 1,
+            spreadApplied: 0,
+        });
+    });
+
+    it('moeda estrangeira: converte pela cotação de mercado atual', () => {
+        const update = buildPurchaseValueUpdate(eur, 600, 6.5)!;
+        expect(update.amountOriginal).toBe(600);
+        expect(update.exchangeRateUsed).toBe(6.5);
+        expect(update.baseRateAtTime).toBe(6.5);
+        expect(update.amountBRL).toBeCloseTo(3900);
+        expect(update.spreadApplied).toBe(0);
+    });
+
+    it('moeda estrangeira sem cotação do momento: reaproveita a taxa da despesa (nunca 1)', () => {
+        expect(buildPurchaseValueUpdate(eur, 600, undefined)!.exchangeRateUsed).toBe(6);
+        expect(buildPurchaseValueUpdate(eur, 600, 0)!.amountBRL).toBeCloseTo(3600);
+    });
+
+    it('despesa antiga sem exchangeRateUsed: deduz a taxa de amountBRL/amountOriginal', () => {
+        const legacy = { amountOriginal: 500, amountBRL: 3000, currency: 'EUR' };
+        expect(buildPurchaseValueUpdate(legacy, 600, undefined)!.exchangeRateUsed).toBe(6);
     });
 });

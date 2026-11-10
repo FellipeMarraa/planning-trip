@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currencies";
 import { EXPENSE_CATEGORIES } from "@/lib/categories";
 import { resizeReceiptToBase64 } from "@/lib/image";
+import { BOOKING_REF_MAX_LENGTH, normalizeBookingRef } from "@/lib/bookingRef";
 import type { Expense, Trip, UserProfile } from '@/types';
 
 const nowForInput = () => format(new Date(), "yyyy-MM-dd'T'HH:mm");
@@ -51,6 +52,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
         // Padrão pendente (orçamento): é como o usuário lança hoje — marca
         // "Comprado" quando de fato comprar e atualiza o valor real.
         purchased: false,
+        bookingRef: '',
     });
 
     useEffect(() => {
@@ -67,6 +69,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 date: expenseToEdit.date || nowForInput(),
                 receiptBase64: expenseToEdit.receiptBase64 || null,
                 purchased: expenseToEdit.purchased === true,
+                bookingRef: expenseToEdit.bookingRef ?? '',
             });
         } else {
             setFormData({
@@ -79,6 +82,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 date: nowForInput(),
                 receiptBase64: null,
                 purchased: false,
+                bookingRef: '',
             });
         }
     }, [expenseToEdit, open]);
@@ -150,11 +154,17 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 // Edição sempre manda o campo explícito (string novo/mantido,
                 // ou null pra remover) — updateExpense trata null como
                 // "apagar comprovante existente" (deleteField).
-                await updateExpense(expenseToEdit.id, { ...payload, receiptBase64: formData.receiptBase64 });
+                await updateExpense(expenseToEdit.id, {
+                    ...payload,
+                    receiptBase64: formData.receiptBase64,
+                    // null remove a referência que já existia (campo apagado de verdade).
+                    bookingRef: normalizeBookingRef(formData.bookingRef),
+                });
             } else {
                 await createExpense({
                     ...payload,
                     ...(formData.receiptBase64 ? { receiptBase64: formData.receiptBase64 } : {}),
+                    ...(normalizeBookingRef(formData.bookingRef) ? { bookingRef: normalizeBookingRef(formData.bookingRef)! } : {}),
                 });
             }
             onOpenChange(false);
@@ -307,6 +317,17 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                                     );
                                 })}
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Código ou link da reserva (opcional)</Label>
+                            <Input
+                                className="h-10"
+                                value={formData.bookingRef}
+                                maxLength={BOOKING_REF_MAX_LENGTH}
+                                onChange={(e) => setFormData({...formData, bookingRef: e.target.value})}
+                                placeholder="Ex: ABC123 ou https://booking.com/..."
+                            />
                         </div>
 
                         <div className="space-y-2">

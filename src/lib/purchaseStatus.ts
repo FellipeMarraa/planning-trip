@@ -55,3 +55,42 @@ export function summarizePurchases(expenses: Pick<Expense, 'purchased' | 'amount
         percentPurchased: totalCount > 0 ? Math.round((purchasedCount / totalCount) * 100) : 0,
     };
 }
+
+export interface PurchaseValueUpdate {
+    amountOriginal: number;
+    amountBRL: number;
+    exchangeRateUsed: number;
+    baseRateAtTime: number;
+    spreadApplied: number;
+}
+
+// Ao marcar como comprado o usuário confirma o valor real. Devolve os campos
+// de valor a gravar, ou `null` se o valor não mudou (aí a cotação histórica
+// da despesa fica intacta — só o status muda). Mesma regra do AddExpenseDialog
+// ao editar: despesa não-BRL sempre usa a cotação de mercado do momento, sem
+// spread. Se a cotação do momento não estiver disponível, cai na taxa que a
+// própria despesa já tinha em vez de assumir 1 (que errava o valor em moeda
+// estrangeira).
+export function buildPurchaseValueUpdate(
+    expense: Pick<Expense, 'amountOriginal' | 'amountBRL' | 'currency' | 'exchangeRateUsed'>,
+    newAmount: number,
+    marketRate: number | undefined
+): PurchaseValueUpdate | null {
+    if (!(newAmount > 0)) return null;
+    if (Math.abs(newAmount - (Number(expense.amountOriginal) || 0)) < 0.005) return null;
+
+    let rate = 1;
+    if (expense.currency !== 'BRL') {
+        const previousRate = Number(expense.exchangeRateUsed)
+            || (Number(expense.amountOriginal) > 0 ? Number(expense.amountBRL) / Number(expense.amountOriginal) : 1);
+        rate = marketRate && marketRate > 0 ? marketRate : previousRate || 1;
+    }
+
+    return {
+        amountOriginal: newAmount,
+        amountBRL: newAmount * rate,
+        exchangeRateUsed: rate,
+        baseRateAtTime: rate,
+        spreadApplied: 0,
+    };
+}

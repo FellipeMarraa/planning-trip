@@ -18,6 +18,9 @@ export interface ExpensePayload {
     // Ausente = pendente (orçamento). Sempre mandado explícito na edição
     // (true/false) pra não depender de o campo já existir no doc.
     purchased?: boolean;
+    // Mesma convenção do comprovante: ausente = não mexe (update) / sem
+    // referência (create); `null` só faz sentido em update e remove a que existia.
+    bookingRef?: string | null;
     // Ausente (chave omitida, não `undefined` — o Firestore JS SDK rejeita
     // campo com valor undefined) = sem comprovante (create) ou "não mexe no
     // que já tinha" (update). `null` só faz sentido em update: remove o
@@ -33,9 +36,10 @@ export async function createExpense(payload: ExpensePayload) {
 }
 
 export async function updateExpense(expenseId: string, payload: ExpensePayload) {
-    const { receiptBase64, ...rest } = payload;
+    const { receiptBase64, bookingRef, ...rest } = payload;
     await updateDoc(doc(db, 'expenses', expenseId), {
         ...rest,
+        ...(bookingRef === null ? { bookingRef: deleteField() } : bookingRef !== undefined ? { bookingRef } : {}),
         ...(receiptBase64 === null ? { receiptBase64: deleteField() } : receiptBase64 !== undefined ? { receiptBase64 } : {}),
         updatedAt: serverTimestamp(),
     });
@@ -45,6 +49,31 @@ export async function updateExpense(expenseId: string, payload: ExpensePayload) 
 export async function setExpensePurchased(expenseId: string, purchased: boolean) {
     await updateDoc(doc(db, 'expenses', expenseId), {
         purchased,
+        updatedAt: serverTimestamp(),
+    });
+}
+
+export interface ConfirmPurchasePatch {
+    // Só presentes quando o valor real mudou (ver buildPurchaseValueUpdate).
+    amountOriginal?: number;
+    amountBRL?: number;
+    exchangeRateUsed?: number;
+    baseRateAtTime?: number;
+    spreadApplied?: number;
+    // string = grava, null = remove a que existia, undefined = não mexe.
+    bookingRef?: string | null;
+}
+
+// "Confirmar compra": marca como comprado, opcionalmente atualizando o valor
+// real e o código/link da reserva, numa única escrita.
+export async function confirmExpensePurchase(expenseId: string, patch: ConfirmPurchasePatch) {
+    const { bookingRef, ...values } = patch;
+    // Firestore rejeita campo com valor undefined — só entram as chaves definidas.
+    const definedValues = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined));
+    await updateDoc(doc(db, 'expenses', expenseId), {
+        ...definedValues,
+        ...(bookingRef === null ? { bookingRef: deleteField() } : bookingRef !== undefined ? { bookingRef } : {}),
+        purchased: true,
         updatedAt: serverTimestamp(),
     });
 }

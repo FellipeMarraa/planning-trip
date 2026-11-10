@@ -13,7 +13,7 @@ import { getMemberName, isGhostUid } from '@/lib/members';
 import { cn } from '@/lib/utils';
 import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember, transferOwnership } from '@/services/trips';
 import { createInvite } from '@/services/invites';
-import { deleteExpense, removeExpenseParticipant, setExpensePurchased } from '@/services/expenses';
+import { confirmExpensePurchase, deleteExpense, removeExpenseParticipant, setExpensePurchased, type ConfirmPurchasePatch } from '@/services/expenses';
 import { createSettlement, deleteSettlement, undoExpensePayment } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/common/stat-card";
@@ -26,6 +26,7 @@ import { ExpenseTable, type ExpenseSortKey, type SortDirection } from "@/compone
 import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsModal";
 import { ReceiptModal } from "@/components/trip/ReceiptModal";
 import { PurchaseProgressCard } from "@/components/trip/PurchaseProgressCard";
+import { ConfirmPurchaseDialog } from "@/components/trip/ConfirmPurchaseDialog";
 import {
     Calendar,
     LogOut,
@@ -76,6 +77,8 @@ export default function TripDetails() {
     // não refletiria na hora, o modal ficaria mostrando o snapshot de quando foi aberto.
     const [expenseToViewId, setExpenseToViewId] = useState<string | null>(null);
     const [receiptToViewId, setReceiptToViewId] = useState<string | null>(null);
+    // Despesa pendente aguardando o passo "Confirmar compra" (valor real + código da reserva).
+    const [expenseToConfirmId, setExpenseToConfirmId] = useState<string | null>(null);
     const [isDeleteTripOpen, setIsDeleteTripOpen] = useState(false);
     const [isLeaveTripOpen, setIsLeaveTripOpen] = useState(false);
     const [isEditTripOpen, setIsEditTripOpen] = useState(false);
@@ -110,6 +113,10 @@ export default function TripDetails() {
     const expenseToView = useMemo(
         () => expenses.find((expense) => expense.id === expenseToViewId) || null,
         [expenses, expenseToViewId]
+    );
+    const expenseToConfirm = useMemo(
+        () => expenses.find((expense) => expense.id === expenseToConfirmId) || null,
+        [expenses, expenseToConfirmId]
     );
     const receiptToView = useMemo(
         () => expenses.find((expense) => expense.id === receiptToViewId) || null,
@@ -209,16 +216,33 @@ export default function TripDetails() {
         }
     };
 
-    // Check da lista: 1 toque alterna Pendente ↔ Comprado (tocar de novo desfaz).
-    // Só o status muda — valor/divisão/saldo continuam como estavam.
+    // Check da lista. Pendente → abre "Confirmar compra" (valor real + código da
+    // reserva; confirmar sem mexer em nada também funciona). Comprado → volta pra
+    // pendente direto, em 1 toque (desfazer clique errado); valor e referência
+    // ficam como estavam.
     const handleTogglePurchased = async (expense: Expense) => {
-        const next = expense.purchased !== true;
+        if (expense.purchased !== true) {
+            setExpenseToConfirmId(expense.id);
+            return;
+        }
         try {
-            await setExpensePurchased(expense.id, next);
-            showSuccess(next ? `"${expense.description}" marcado como comprado.` : `"${expense.description}" voltou para pendente.`);
+            await setExpensePurchased(expense.id, false);
+            showSuccess(`"${expense.description}" voltou para pendente.`);
         } catch (err) {
             console.error("Erro ao alterar status de compra:", err);
             showError("Não foi possível alterar o status da despesa.");
+        }
+    };
+
+    const handleConfirmPurchase = async (expense: Expense, patch: ConfirmPurchasePatch): Promise<boolean> => {
+        try {
+            await confirmExpensePurchase(expense.id, patch);
+            showSuccess(`"${expense.description}" marcado como comprado.`);
+            return true;
+        } catch (err) {
+            console.error("Erro ao confirmar compra:", err);
+            showError("Não foi possível confirmar a compra. Tente novamente.");
+            return false;
         }
     };
 
@@ -564,6 +588,14 @@ export default function TripDetails() {
                     onTogglePurchased={handleTogglePurchased}
                 />
             )}
+
+            <ConfirmPurchaseDialog
+                open={!!expenseToConfirmId}
+                onOpenChange={(open) => { if (!open) setExpenseToConfirmId(null); }}
+                expense={expenseToConfirm}
+                marketRate={expenseToConfirm ? currentRates[expenseToConfirm.currency] : undefined}
+                onConfirm={handleConfirmPurchase}
+            />
 
             <ReceiptModal
                 open={!!receiptToViewId}
