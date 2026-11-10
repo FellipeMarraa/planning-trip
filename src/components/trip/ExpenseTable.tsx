@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ExpenseCard } from "@/components/trip/ExpenseCard";
 import { getMemberName } from "@/lib/members";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Receipt, Trash2, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +15,14 @@ import type { Expense, Trip, UserProfile } from '@/types';
 
 export type ExpenseSortKey = 'description' | 'category' | 'amountOriginal' | 'amountBRL';
 export type SortDirection = 'asc' | 'desc';
+
+// No celular não há cabeçalho de tabela clicável: a ordenação vira um seletor.
+const MOBILE_SORT_OPTIONS: { value: ExpenseSortKey; label: string }[] = [
+    { value: 'description', label: 'Descrição' },
+    { value: 'category', label: 'Categoria' },
+    { value: 'amountOriginal', label: 'Valor de origem' },
+    { value: 'amountBRL', label: 'Total (BRL)' },
+];
 
 interface ExpenseTableProps {
     trip: Trip;
@@ -62,7 +72,8 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                 <SectionHeader>Despesas</SectionHeader>
             </div>
 
-            <div className="overflow-x-auto w-full">
+            {/* Tabela: tela média pra cima. No celular (< md) vira lista de cartões, abaixo. */}
+            <div className="hidden md:block overflow-x-auto w-full">
                 <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                     <tr className="text-xs text-muted-foreground border-b border-border">
@@ -178,6 +189,57 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                     )}
                     </tbody>
                 </table>
+            </div>
+
+            <div className="md:hidden">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                    <Select
+                        value={sortKey ?? ''}
+                        onValueChange={(value) => { if (value !== sortKey) onSort(value as ExpenseSortKey); }}
+                    >
+                        <SelectTrigger className="h-9 flex-1 rounded-xl" aria-label="Ordenar despesas por">
+                            <SelectValue placeholder="Ordenar por" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {MOBILE_SORT_OPTIONS.map(({ value, label }) => (
+                                <SelectItem key={value} value={value}>{label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!sortKey}
+                        onClick={() => sortKey && onSort(sortKey)}
+                        aria-label={sortDirection === 'asc' ? 'Ordem crescente — tocar para inverter' : 'Ordem decrescente — tocar para inverter'}
+                        className="h-9 w-9 p-0 rounded-xl"
+                    >
+                        {sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                </div>
+
+                {expenses.length === 0 ? (
+                    <EmptyState icon={Wallet} message="Nenhuma despesa registrada" dashed={false} />
+                ) : (
+                    <ul className="divide-y divide-border">
+                        {expenses.map((expense) => (
+                            <ExpenseCard
+                                key={expense.id}
+                                expense={expense}
+                                trip={trip}
+                                profiles={profiles}
+                                canEdit={canEdit}
+                                currentRates={currentRates}
+                                isDomesticBRL={isDomesticBRL}
+                                onEdit={onEdit}
+                                onDelete={onDelete}
+                                onViewParticipants={onViewParticipants}
+                                onViewReceipt={onViewReceipt}
+                                onTogglePurchased={onTogglePurchased}
+                            />
+                        ))}
+                    </ul>
+                )}
             </div>
 
             {totalPages > 1 && (

@@ -26,6 +26,10 @@ Não há sidebar — `Layout.tsx` é um único header fixo no topo com logo/link
 
 `index.html` já tem `viewport-fit=cover`, e `Layout.tsx` cobre a maioria das telas com `pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]` no container raiz. **Isso não cobre elementos `fixed`** (escapam do fluxo/padding do pai) nem páginas que não usam `Layout` (a de itinerário) — cada um desses precisa da própria safe area, senão, num PWA instalado ("Adicionar à tela de início", sem chrome do navegador), o conteúdo do topo fica embaixo da barra de status (bateria/relógio/wifi) e o de baixo embaixo da gesture bar do iOS. Já corrigido em: `AiAssistantWidget.tsx` (painel `fixed inset-0` no mobile + botão flutuante) e `TripItineraryPage.tsx` (header/footer, por não usar `Layout`). Qualquer elemento novo `fixed` que toque a borda da tela, ou página nova fora de `Layout`, precisa do mesmo tratamento.
 
+### 3.1 Lista de despesas: tabela no desktop, cartões no celular
+
+`ExpenseTable.tsx` renderiza **dois layouts dos mesmos dados** (mesmos handlers, nada duplicado em lógica): a tabela (`hidden md:block`, 7 colunas, largura mínima 700px) e, abaixo de `md` (768px), uma lista de `ExpenseCard` (`md:hidden`). Motivo: no celular a tabela rolava de lado e as ações (participantes/editar/excluir) ficavam na última coluna, fora da tela. No cartão as ações viram um menu "⋮" (alvo de toque de 44px) e a ordenação — que no desktop é clicar no cabeçalho — vira um seletor "Ordenar por" + botão de direção. Qualquer coluna/campo novo de despesa precisa entrar **nos dois** (tabela e `ExpenseCard.tsx`). Filtros e paginação são compartilhados.
+
 ## 5. Reutilização de componentes — nunca duplicar
 
 Antes de criar um componente novo, checar `components/common/*` (primitivas: `empty-state`, `money-input`, `section-header`, `stat-card`) e `components/trip/*` (feature: diálogos, tabelas, modais já existentes) — o padrão de "estado vazio" (`empty-state.tsx`) e o de input monetário (`money-input.tsx`) já resolvidos ali devem ser reaproveitados, não reescritos dentro de uma feature nova.
