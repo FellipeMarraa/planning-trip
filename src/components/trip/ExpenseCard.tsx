@@ -1,13 +1,6 @@
 // src/components/trip/ExpenseCard.tsx
-import { MoreVertical, Pencil, Receipt, Trash2, Users } from "lucide-react";
+import { Pencil, Receipt, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { BookingRefLine, PurchaseCheck } from "@/components/trip/purchase-status-parts";
 import { getMemberName } from "@/lib/members";
 import { formatDateTimeBR } from "@/lib/dates";
@@ -32,17 +25,38 @@ interface ExpenseCardProps {
     onTogglePurchased: (expense: Expense) => void;
 }
 
+// Botão de ação do cartão: alvo de toque de 44px, sempre visível — sem menu
+// popover. A 1ª versão usava um menu "⋮" (DropdownMenu) e, num celular real,
+// o toque nele não abria nada (não reproduzido em Chromium com toque, build de
+// produção e re-renderizações; WebKit não pôde ser testado). Botões diretos não
+// dependem de popover/portal e são o mesmo tipo de botão do check, que funciona.
+function ActionButton({ label, onClick, destructive, children }: { label: string; onClick: () => void; destructive?: boolean; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-label={label}
+            title={label}
+            className={cn(
+                "h-11 w-11 flex items-center justify-center rounded-lg text-muted-foreground transition-colors",
+                destructive ? "active:text-destructive active:bg-destructive/10 hover:text-destructive" : "active:text-primary active:bg-primary/10 hover:text-primary"
+            )}
+        >
+            {children}
+        </button>
+    );
+}
+
 // Despesa em formato de cartão — usado no celular no lugar da linha da tabela
 // (que tem 7 colunas, largura mínima de 700px e deixava as ações escondidas na
-// última coluna). Mesmos dados e mesmos handlers da tabela; as ações viram um
-// menu "⋮" sempre alcançável, sem rolar pro lado.
+// última coluna). Mesmos dados e mesmos handlers da tabela.
 export function ExpenseCard({ expense, trip, profiles, canEdit, currentRates, isDomesticBRL, onEdit, onDelete, onViewParticipants, onViewReceipt, onTogglePurchased }: ExpenseCardProps) {
     const purchased = isPurchased(expense);
     const hasReceipt = !!expense.receiptBase64;
     const isForeign = expense.currency !== 'BRL';
 
     return (
-        <li className="flex items-start gap-1 pl-3 pr-2 py-3">
+        <li className="flex items-start gap-1 pl-3 pr-3 py-3">
             <PurchaseCheck
                 purchased={purchased}
                 description={expense.description}
@@ -79,42 +93,30 @@ export function ExpenseCard({ expense, trip, profiles, canEdit, currentRates, is
                         </p>
                     )}
                 </div>
-            </div>
 
-            {(canEdit || hasReceipt) && (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label={`Mais ações de ${expense.description}`}
-                            className="h-11 w-11 flex-shrink-0 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none"
-                        >
-                            <MoreVertical className="h-5 w-5" />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
+                {(canEdit || hasReceipt) && (
+                    <div className="flex items-center gap-1 -ml-2.5 pt-0.5 border-t border-border/60">
                         {hasReceipt && (
-                            <DropdownMenuItem onClick={() => onViewReceipt(expense)}>
-                                <Receipt className="w-4 h-4 mr-2 text-primary" /> Ver comprovante
-                            </DropdownMenuItem>
+                            <ActionButton label={`Ver comprovante de ${expense.description}`} onClick={() => onViewReceipt(expense)}>
+                                <Receipt className="h-5 w-5" />
+                            </ActionButton>
                         )}
                         {canEdit && (
                             <>
-                                <DropdownMenuItem onClick={() => onViewParticipants(expense)}>
-                                    <Users className="w-4 h-4 mr-2 text-primary" /> Participantes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onEdit(expense)}>
-                                    <Pencil className="w-4 h-4 mr-2 text-primary" /> Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem variant="destructive" onClick={() => onDelete(expense)}>
-                                    <Trash2 className="w-4 h-4 mr-2" /> Excluir
-                                </DropdownMenuItem>
+                                <ActionButton label={`Ver participantes de ${expense.description}`} onClick={() => onViewParticipants(expense)}>
+                                    <Users className="h-5 w-5" />
+                                </ActionButton>
+                                <ActionButton label={`Editar ${expense.description}`} onClick={() => onEdit(expense)}>
+                                    <Pencil className="h-5 w-5" />
+                                </ActionButton>
+                                <ActionButton label={`Excluir ${expense.description}`} onClick={() => onDelete(expense)} destructive>
+                                    <Trash2 className="h-5 w-5" />
+                                </ActionButton>
                             </>
                         )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
+                    </div>
+                )}
+            </div>
         </li>
     );
 }
