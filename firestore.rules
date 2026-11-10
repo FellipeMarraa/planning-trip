@@ -184,6 +184,15 @@ service cloud.firestore {
         (resource.data.paidBy == request.auth.uid
           ? (request.resource.data.paidBy != request.auth.uid && request.resource.data.paidBy in request.resource.data.participants)
           : request.resource.data.paidBy == resource.data.paidBy) &&
+        // O substituto tem que ser um fantasma (ghost_*), nunca outro uid qualquer —
+        // senão quem "sai" empurraria a própria cota/dívida pra outra pessoa. Em
+        // `participants` o substituto ocupa a MESMA posição do uid que saiu (o client
+        // faz map in-place); comparar a lista como texto com o uid trocado por um
+        // padrão ghost_* garante isso sem precisar iterar.
+        (resource.data.paidBy != request.auth.uid || isGhostUid(request.resource.data.paidBy)) &&
+        request.resource.data.participants.join(',').matches(
+          resource.data.participants.join(',').replace(request.auth.uid, 'ghost_[A-Za-z0-9-]+')
+        ) &&
         !(request.auth.uid in request.resource.data.participants) &&
         request.resource.data.participants.size() == resource.data.participants.size() &&
         resource.data.participants.hasOnly(request.resource.data.participants.concat([request.auth.uid])) &&
@@ -278,6 +287,9 @@ service cloud.firestore {
         (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid) &&
         (resource.data.from == request.auth.uid ? request.resource.data.from != request.auth.uid : request.resource.data.from == resource.data.from) &&
         (resource.data.to == request.auth.uid ? request.resource.data.to != request.auth.uid : request.resource.data.to == resource.data.to) &&
+        // Substituto tem que ser um fantasma (ghost_*), nunca outro uid qualquer.
+        (resource.data.from != request.auth.uid || isGhostUid(request.resource.data.from)) &&
+        (resource.data.to != request.auth.uid || isGhostUid(request.resource.data.to)) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['from', 'to'])
       );
     }

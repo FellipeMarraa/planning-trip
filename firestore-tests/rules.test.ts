@@ -923,3 +923,72 @@ describe('firestore.rules — users: get liberado, list só admin', () => {
         await assertSucceeds(getDocs(collection(asUser('admin-1'), 'users')));
     });
 });
+
+describe('firestore.rules — sair da viagem: substituto só pode ser um fantasma (expenses/settlements)', () => {
+    // viewer-1 não é canEdit, então só o branch "sair da viagem" pode autorizar a escrita.
+    async function seedLeaveScenario() {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip({
+                participants: ['owner-1', 'viewer-1'],
+                roles: { 'owner-1': 'OWNER', 'viewer-1': 'VIEWER' },
+            }));
+            await setDoc(doc(db, 'expenses', 'exp-1'), {
+                tripId: 'trip-1', description: 'Jantar', category: 'Alimentação',
+                amountOriginal: 100, currency: 'BRL', amountBRL: 100,
+                paidBy: 'viewer-1', participants: ['owner-1', 'viewer-1'], date: '2027-06-02',
+            });
+            await setDoc(doc(db, 'settlements', 'set-1'), { tripId: 'trip-1', from: 'viewer-1', to: 'owner-1', amount: 30 });
+        });
+    }
+
+    it('expense: quem sai troca o próprio uid por um fantasma (pagador e divisor)', async () => {
+        await seedLeaveScenario();
+        await assertSucceeds(
+            updateDoc(doc(asUser('viewer-1'), 'expenses', 'exp-1'), {
+                paidBy: 'ghost_aaaa-1111',
+                participants: ['owner-1', 'ghost_aaaa-1111'],
+            })
+        );
+    });
+
+    it('expense: quem sai NÃO empurra a cota pra outro uid qualquer', async () => {
+        await seedLeaveScenario();
+        await assertFails(
+            updateDoc(doc(asUser('viewer-1'), 'expenses', 'exp-1'), {
+                paidBy: 'ghost_aaaa-1111',
+                participants: ['owner-1', 'stranger-1'],
+            })
+        );
+    });
+
+    it('expense: quem sai NÃO duplica outro participante no lugar da própria cota', async () => {
+        await seedLeaveScenario();
+        await assertFails(
+            updateDoc(doc(asUser('viewer-1'), 'expenses', 'exp-1'), {
+                paidBy: 'ghost_aaaa-1111',
+                participants: ['owner-1', 'owner-1'],
+            })
+        );
+    });
+
+    it('expense: quem sai NÃO vira pagador de outro uid qualquer', async () => {
+        await seedLeaveScenario();
+        await assertFails(
+            updateDoc(doc(asUser('viewer-1'), 'expenses', 'exp-1'), {
+                paidBy: 'owner-1',
+                participants: ['owner-1', 'ghost_aaaa-1111'],
+            })
+        );
+    });
+
+    it('settlement: quem sai troca o próprio uid por um fantasma', async () => {
+        await seedLeaveScenario();
+        await assertSucceeds(updateDoc(doc(asUser('viewer-1'), 'settlements', 'set-1'), { from: 'ghost_aaaa-1111' }));
+    });
+
+    it('settlement: quem sai NÃO empurra o acerto pra outro uid qualquer', async () => {
+        await seedLeaveScenario();
+        await assertFails(updateDoc(doc(asUser('viewer-1'), 'settlements', 'set-1'), { from: 'stranger-1' }));
+        await assertFails(updateDoc(doc(asUser('viewer-1'), 'settlements', 'set-1'), { from: 'owner-1' }));
+    });
+});
