@@ -15,6 +15,9 @@ export interface ExpensePayload {
     paidBy: string;
     participants: string[];
     date: string;
+    // Ausente = pendente (orçamento). Sempre mandado explícito na edição
+    // (true/false) pra não depender de o campo já existir no doc.
+    purchased?: boolean;
     // Ausente (chave omitida, não `undefined` — o Firestore JS SDK rejeita
     // campo com valor undefined) = sem comprovante (create) ou "não mexe no
     // que já tinha" (update). `null` só faz sentido em update: remove o
@@ -34,6 +37,14 @@ export async function updateExpense(expenseId: string, payload: ExpensePayload) 
     await updateDoc(doc(db, 'expenses', expenseId), {
         ...rest,
         ...(receiptBase64 === null ? { receiptBase64: deleteField() } : receiptBase64 !== undefined ? { receiptBase64 } : {}),
+        updatedAt: serverTimestamp(),
+    });
+}
+
+// Alterna só o status de compra (check da lista), sem tocar em valor/divisão.
+export async function setExpensePurchased(expenseId: string, purchased: boolean) {
+    await updateDoc(doc(db, 'expenses', expenseId), {
+        purchased,
         updatedAt: serverTimestamp(),
     });
 }

@@ -43,6 +43,10 @@ export interface Expense {
     exchangeRateUsed?: number;   // A taxa final (ex: 5.91) — sempre cotação de mercado pra despesa não-BRL
     baseRateAtTime?: number;
     receiptBase64?: string;      // comprovante/recibo, mesmo padrão do avatar (base64 direto, sem Firebase Storage)
+    // true = já foi comprado/reservado de fato; ausente/false = só orçamento
+    // (valor estimado). Informativo: não altera saldos nem divisão — ver
+    // src/lib/purchaseStatus.ts e docs/DATABASE.md 2.2.
+    purchased?: boolean;
 }
 
 // Um lote de moeda estrangeira comprado por um participante, pra uma viagem

@@ -4,20 +4,33 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Filter, Search, X } from "lucide-react";
 import { CURRENCIES } from "@/lib/currencies";
+import { cn } from "@/lib/utils";
+import type { PurchaseFilter } from "@/lib/purchaseStatus";
 
 interface ExpenseFiltersProps {
     categories: string[];
     filterCategory: string;
     filterCurrency: string;
+    filterPurchase: PurchaseFilter;
     searchQuery: string;
+    // Contagem de cada opção do filtro de status, sobre as despesas visíveis
+    // (antes de aplicar categoria/moeda/busca, pra não "sumir" com as opções).
+    purchaseCounts: Record<PurchaseFilter, number>;
     onCategoryChange: (value: string) => void;
     onCurrencyChange: (value: string) => void;
+    onPurchaseChange: (value: PurchaseFilter) => void;
     onSearchChange: (value: string) => void;
     onReset: () => void;
 }
 
-export function ExpenseFilters({ categories, filterCategory, filterCurrency, searchQuery, onCategoryChange, onCurrencyChange, onSearchChange, onReset }: ExpenseFiltersProps) {
-    const hasActiveFilter = filterCategory !== 'all' || filterCurrency !== 'all' || searchQuery !== '';
+const PURCHASE_OPTIONS: { value: PurchaseFilter; label: string }[] = [
+    { value: 'all', label: 'Todas' },
+    { value: 'pending', label: 'Pendentes' },
+    { value: 'purchased', label: 'Compradas' },
+];
+
+export function ExpenseFilters({ categories, filterCategory, filterCurrency, filterPurchase, searchQuery, purchaseCounts, onCategoryChange, onCurrencyChange, onPurchaseChange, onSearchChange, onReset }: ExpenseFiltersProps) {
+    const hasActiveFilter = filterCategory !== 'all' || filterCurrency !== 'all' || filterPurchase !== 'all' || searchQuery !== '';
 
     return (
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-card border border-border p-3 rounded-2xl">
@@ -58,6 +71,26 @@ export function ExpenseFilters({ categories, filterCategory, filterCurrency, sea
                         ))}
                     </SelectContent>
                 </Select>
+
+                <div role="group" aria-label="Filtrar por status de compra" className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                    {PURCHASE_OPTIONS.map(({ value, label }) => {
+                        const active = filterPurchase === value;
+                        return (
+                            <button
+                                key={value}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => onPurchaseChange(value)}
+                                className={cn(
+                                    "h-9 px-3 rounded-xl text-xs font-medium border whitespace-nowrap transition-colors",
+                                    active ? "bg-primary/15 border-primary text-primary" : "bg-muted/50 border-border text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {label} <span className="tabular-nums opacity-70">{purchaseCounts[value]}</span>
+                            </button>
+                        );
+                    })}
+                </div>
 
                 {hasActiveFilter && (
                     <Button

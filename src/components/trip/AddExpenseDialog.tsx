@@ -48,6 +48,9 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
         date: nowForInput(),
         // null = sem comprovante (ou removido); string = base64 (novo ou o que já existia)
         receiptBase64: null as string | null,
+        // Padrão pendente (orçamento): é como o usuário lança hoje — marca
+        // "Comprado" quando de fato comprar e atualiza o valor real.
+        purchased: false,
     });
 
     useEffect(() => {
@@ -63,6 +66,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 // em 2026-09-02) cai no "agora" — usuário ajusta se lembrar.
                 date: expenseToEdit.date || nowForInput(),
                 receiptBase64: expenseToEdit.receiptBase64 || null,
+                purchased: expenseToEdit.purchased === true,
             });
         } else {
             setFormData({
@@ -74,6 +78,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                 participants: trip.participants || [],
                 date: nowForInput(),
                 receiptBase64: null,
+                purchased: false,
             });
         }
     }, [expenseToEdit, open]);
@@ -137,6 +142,7 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
             paidBy: formData.paidBy,
             participants: formData.participants,
             date: formData.date,
+            purchased: formData.purchased,
         };
 
         try {
@@ -175,6 +181,32 @@ export default function AddExpenseDialog({ open, onOpenChange, trip, profiles, r
                     </DialogHeader>
 
                     <div className="p-6 space-y-5 overflow-y-auto scrollbar-none flex-1 min-h-0">
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                            <div role="group" aria-label="Status de compra" className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted/50 border border-border">
+                                {([
+                                    { value: false, label: 'Pendente', hint: 'Só orçamento' },
+                                    { value: true, label: 'Comprado', hint: 'Já foi comprado' },
+                                ] as const).map(({ value, label, hint }) => (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        aria-pressed={formData.purchased === value}
+                                        onClick={() => setFormData({...formData, purchased: value})}
+                                        className={cn(
+                                            "h-12 rounded-lg text-sm font-medium transition-colors flex flex-col items-center justify-center leading-tight",
+                                            formData.purchased === value
+                                                ? "bg-card text-foreground shadow-sm border border-border"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        {label}
+                                        <span className="text-[10px] font-normal opacity-70">{hint}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
                             <Label className="text-sm font-medium text-muted-foreground">Descrição</Label>
                             <Input

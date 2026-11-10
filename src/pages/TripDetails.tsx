@@ -13,7 +13,7 @@ import { getMemberName, isGhostUid } from '@/lib/members';
 import { cn } from '@/lib/utils';
 import { addGhostMember, changeMemberRole, deleteTripCascade, leaveTripAsGhost, linkGhostToUser, removeMember, renameGhostMember, transferOwnership } from '@/services/trips';
 import { createInvite } from '@/services/invites';
-import { deleteExpense, removeExpenseParticipant } from '@/services/expenses';
+import { deleteExpense, removeExpenseParticipant, setExpensePurchased } from '@/services/expenses';
 import { createSettlement, deleteSettlement, undoExpensePayment } from '@/services/settlements';
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/common/stat-card";
@@ -25,6 +25,7 @@ import { ExpenseFilters } from "@/components/trip/ExpenseFilters";
 import { ExpenseTable, type ExpenseSortKey, type SortDirection } from "@/components/trip/ExpenseTable";
 import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsModal";
 import { ReceiptModal } from "@/components/trip/ReceiptModal";
+import { PurchaseProgressCard } from "@/components/trip/PurchaseProgressCard";
 import {
     Calendar,
     LogOut,
@@ -60,6 +61,7 @@ import AddExpenseDialog from '@/components/trip/AddExpenseDialog';
 import EditTripDialog from '@/components/trip/EditTripDialog';
 import TripAnalytics from '@/components/trip/TripAnalytics';
 import { formatDateBR } from '@/lib/dates';
+import { matchesPurchaseFilter, summarizePurchases, type PurchaseFilter } from '@/lib/purchaseStatus';
 import type { Expense, SettlementAllocation, UserRole } from '@/types';
 
 export default function TripDetails() {
@@ -80,6 +82,7 @@ export default function TripDetails() {
 
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterCurrency, setFilterCurrency] = useState<string>('all');
+    const [filterPurchase, setFilterPurchase] = useState<PurchaseFilter>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<ExpenseSortKey | null>(null);
     const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -125,9 +128,19 @@ export default function TripDetails() {
             const matchCategory = filterCategory === 'all' || expense.category === filterCategory;
             const matchCurrency = filterCurrency === 'all' || expense.currency === filterCurrency;
             const matchSearch = query === '' || expense.description.toLowerCase().includes(query);
-            return matchCategory && matchCurrency && matchSearch;
+            const matchPurchase = matchesPurchaseFilter(expense, filterPurchase);
+            return matchCategory && matchCurrency && matchSearch && matchPurchase;
         });
-    }, [visibleExpenses, filterCategory, filterCurrency, searchQuery]);
+    }, [visibleExpenses, filterCategory, filterCurrency, filterPurchase, searchQuery]);
+
+    // Resumo e contagens do filtro de status sobre o que o usuário pode ver
+    // (visualizador só enxerga despesas em que participa), antes dos demais filtros.
+    const purchaseSummary = useMemo(() => summarizePurchases(visibleExpenses), [visibleExpenses]);
+    const purchaseCounts = useMemo<Record<PurchaseFilter, number>>(() => ({
+        all: purchaseSummary.totalCount,
+        pending: purchaseSummary.pendingCount,
+        purchased: purchaseSummary.purchasedCount,
+    }), [purchaseSummary]);
 
     const sortedExpenses = useMemo(() => {
         if (!sortKey) return filteredExpenses;
@@ -196,6 +209,19 @@ export default function TripDetails() {
         }
     };
 
+    // Check da lista: 1 toque alterna Pendente ↔ Comprado (tocar de novo desfaz).
+    // Só o status muda — valor/divisão/saldo continuam como estavam.
+    const handleTogglePurchased = async (expense: Expense) => {
+        const next = expense.purchased !== true;
+        try {
+            await setExpensePurchased(expense.id, next);
+            showSuccess(next ? `"${expense.description}" marcado como comprado.` : `"${expense.description}" voltou para pendente.`);
+        } catch (err) {
+            console.error("Erro ao alterar status de compra:", err);
+            showError("Não foi possível alterar o status da despesa.");
+        }
+    };
+
     const handleRemoveExpenseParticipant = async (expenseId: string, uid: string) => {
         try {
             await removeExpenseParticipant(expenseId, uid);
@@ -236,6 +262,7 @@ export default function TripDetails() {
     const resetFilters = () => {
         setFilterCategory('all');
         setFilterCurrency('all');
+        setFilterPurchase('all');
         setSearchQuery('');
         setCurrentPage(1);
     };
@@ -459,11 +486,13 @@ export default function TripDetails() {
                 />
             )}
 
+            <PurchaseProgressCard summary={purchaseSummary} />
+
             <div className={cn("grid grid-cols-1 gap-4", !isDomesticBRL && "sm:grid-cols-3")}>
                 <StatCard
-                    label="Total desembolsado"
+                    label="Total previsto"
                     value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalBRLRealizado)}
-                    hint="Base acumulada com taxas"
+                    hint="Comprado + pendente"
                     accent="primary"
                 />
                 {!isDomesticBRL && (
@@ -503,9 +532,12 @@ export default function TripDetails() {
                 categories={categories}
                 filterCategory={filterCategory}
                 filterCurrency={filterCurrency}
+                filterPurchase={filterPurchase}
                 searchQuery={searchQuery}
+                purchaseCounts={purchaseCounts}
                 onCategoryChange={(v) => { setFilterCategory(v); setCurrentPage(1); }}
                 onCurrencyChange={(v) => { setFilterCurrency(v); setCurrentPage(1); }}
+                onPurchaseChange={(v) => { setFilterPurchase(v); setCurrentPage(1); }}
                 onSearchChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
                 onReset={resetFilters}
             />
@@ -529,6 +561,7 @@ export default function TripDetails() {
                     onDelete={setExpenseToDelete}
                     onViewParticipants={(expense) => setExpenseToViewId(expense.id)}
                     onViewReceipt={(expense) => setReceiptToViewId(expense.id)}
+                    onTogglePurchased={handleTogglePurchased}
                 />
             )}
 

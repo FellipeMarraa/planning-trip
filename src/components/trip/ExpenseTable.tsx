@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { getMemberName } from "@/lib/members";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Receipt, Trash2, Users, Wallet } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleDashed, Pencil, Receipt, Trash2, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTimeBR } from "@/lib/dates";
+import { isPurchased } from "@/lib/purchaseStatus";
 import type { Expense, Trip, UserProfile } from '@/types';
 
 export type ExpenseSortKey = 'description' | 'category' | 'amountOriginal' | 'amountBRL';
@@ -30,12 +31,42 @@ interface ExpenseTableProps {
     onDelete: (expense: Expense) => void;
     onViewParticipants: (expense: Expense) => void;
     onViewReceipt: (expense: Expense) => void;
+    onTogglePurchased: (expense: Expense) => void;
 }
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, isDomesticBRL, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants, onViewReceipt }: ExpenseTableProps) {
+// Check da primeira coluna: 1 toque alterna Pendente ↔ Comprado (tocar de novo
+// desfaz). Quem só visualiza vê o mesmo ícone, sem ação. Estado nunca só por
+// cor — formas diferentes (círculo cheio com check vs. tracejado) + texto na
+// célula de descrição.
+function PurchaseCheck({ purchased, description, canEdit, onToggle }: { purchased: boolean; description: string; canEdit: boolean; onToggle: () => void }) {
+    const Icon = purchased ? CheckCircle2 : CircleDashed;
+    const iconClass = cn("h-5 w-5", purchased ? "text-chart-2" : "text-muted-foreground/70");
+
+    if (!canEdit) {
+        return (
+            <span className="h-11 w-8 flex items-center justify-center" role="img" aria-label={purchased ? 'Comprado' : 'Pendente'}>
+                <Icon className={iconClass} />
+            </span>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={purchased}
+            aria-label={purchased ? `Desmarcar ${description} como comprado` : `Marcar ${description} como comprado`}
+            className="h-11 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
+        >
+            <Icon className={iconClass} />
+        </button>
+    );
+}
+
+export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, isDomesticBRL, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants, onViewReceipt, onTogglePurchased }: ExpenseTableProps) {
     const SortableHeader = ({ column, label, align }: { column: ExpenseSortKey; label: string; align?: 'right' }) => (
         <th className={cn("px-6 py-3 font-medium", align === 'right' && "text-right")}>
             <button
@@ -63,6 +94,9 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                 <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                     <tr className="text-xs text-muted-foreground border-b border-border">
+                        <th className="sticky left-0 z-10 bg-card pl-4 pr-2 py-3 w-12">
+                            <span className="sr-only">Status de compra</span>
+                        </th>
                         <SortableHeader column="description" label="Descrição" />
                         <SortableHeader column="category" label="Categoria" />
                         <th className="px-6 py-3 font-medium">Pago por</th>
@@ -74,13 +108,21 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                     <tbody className="divide-y divide-border">
                     {expenses.length === 0 ? (
                         <tr>
-                            <td colSpan={canEdit ? 6 : 5} className="p-0">
+                            <td colSpan={canEdit ? 7 : 6} className="p-0">
                                 <EmptyState icon={Wallet} message="Nenhuma despesa registrada" dashed={false} />
                             </td>
                         </tr>
                     ) : (
                         expenses.map((expense) => (
                             <tr key={expense.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="sticky left-0 z-10 bg-card pl-4 pr-2 py-4 w-12">
+                                    <PurchaseCheck
+                                        purchased={isPurchased(expense)}
+                                        description={expense.description}
+                                        canEdit={canEdit}
+                                        onToggle={() => onTogglePurchased(expense)}
+                                    />
+                                </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-1.5">
                                         <p className="text-sm font-medium text-foreground">{expense.description}</p>
@@ -96,6 +138,9 @@ export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, cu
                                         )}
                                     </div>
                                     <p className="text-xs text-muted-foreground tabular-nums">{formatDateTimeBR(expense.date)}</p>
+                                    <p className={cn("text-xs font-medium", isPurchased(expense) ? "text-chart-2" : "text-muted-foreground")}>
+                                        {isPurchased(expense) ? 'Comprado' : 'Pendente'}
+                                    </p>
                                     <p className="text-xs text-muted-foreground">
                                         {expense.currency === 'BRL' ? 'Sem conversão' : expense.spreadApplied ? `Spread: ${expense.spreadApplied}%` : 'Taxa não informada'}
                                     </p>
