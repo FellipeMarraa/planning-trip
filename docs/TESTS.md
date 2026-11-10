@@ -25,6 +25,8 @@ Implementado: `firestore-tests/rules.test.ts` (mesmo padrão do CashZ — `initi
 
 Cobre, com pelo menos 1 caso permite + 1 nega cada: os 4 branches de `update` em `trips` (edição normal, auto-join via convite, sair como fantasma, **transferir dono** — o mais recente e o de maior risco por ser um branch novo), `create`/`read`/`delete` de `trips`, `expenses`, `settlements` (o `to == request.auth.uid` do create), `users/{uid}` (a whitelist de campos — inclui um teste específico pro trust boundary do plano CashZ: client não escreve `plan` direto), `ai_threads`/`ai_messages`/`ai_usage` (só o backend escreve) e `invites`.
 
+**Rodar com Java 17 (verificado em 2026-11)**: o `firebase-tools@15` instalado recusa Java < 21, mas a versão 14 ainda aceita Java 17 — `npx --yes firebase-tools@14 emulators:exec --only firestore --project planning-trip-6a9cb "npx vitest run --config vitest.rules.config.ts"` rodou a suíte inteira (42 casos na época) sem instalar JDK nem alterar o `package.json`. Atalho até o time migrar pra JDK 21; o `firestore-debug.log` que o emulador cria é ignorado pelo `.gitignore` (`*.log`). As regras e testes adicionados em 2026-11 (`trip_joins`, `ownerId` imutável, `delete` só do dono, `users` sem `list`, `update` de despesa/acerto) foram escritos e **ainda não rodados** — rodar esse comando antes de fazer o deploy das regras.
+
 **Exige Java 21+ local** pro Firebase Emulator (mesmo requisito do CashZ) — sem isso, `npm run test:rules` falha com `firebase-tools no longer supports Java version before 21`. O arquivo de teste em si foi validado sem emulador (`npx vitest run --config vitest.rules.config.ts` reconhece as 32 asserções, sem erro de sintaxe/import/tipo) — só não roda de fato sem o JDK certo.
 
 ### 4.1 `useTripBalances` (prioridade 2)

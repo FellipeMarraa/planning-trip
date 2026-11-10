@@ -36,7 +36,7 @@ Configuradas no Vercel do **planning-trip**, nunca no do CashZ — esse backend 
 
 ## 4. Firebase — configuração que não vive no repositório
 
-- Regras de segurança (`firestore.rules`) exigem deploy manual: `firebase deploy --only firestore:rules --project planning-trip-6a9cb`. Não é automático pelo pipeline do Vercel.
+- Regras de segurança (`firestore.rules`) exigem deploy manual: `firebase deploy --only firestore:rules --project planning-trip-6a9cb`. Não é automático pelo pipeline do Vercel. Ordem recomendada quando a mudança de regra tem contrapartida no client (ex.: `trip_joins`, 2026-11): o client é compatível com as regras antigas e com as novas, então o push na `main` e o deploy das regras podem acontecer em qualquer ordem; conferir depois que entrar por link de convite e excluir viagem (só dono) continuam funcionando.
 - `firestore.indexes.json` também exige deploy manual: `firebase deploy --only firestore:indexes --project planning-trip-6a9cb` (ver [DATABASE.md](./DATABASE.md) seção 5) — não é automático pelo pipeline do Vercel, igual às regras.
 - Login habilitado no Firebase Auth: só Google (ver [ARCHITECTURE.md](./ARCHITECTURE.md) seção 4) — qualquer provedor novo precisa ser habilitado manualmente no console do Firebase antes de aparecer no código.
 

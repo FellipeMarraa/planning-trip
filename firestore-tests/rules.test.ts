@@ -6,7 +6,7 @@ import {
     assertFails,
     type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, deleteDoc, getDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, deleteField, getDoc, getDocs, addDoc, collection } from 'firebase/firestore';
 
 /**
  * Testa firestore.rules direto contra o Firestore Emulator — ver docs/TESTS.md
@@ -59,6 +59,18 @@ function baseTrip(overrides: Record<string, unknown> = {}) {
         exchangeRates: { EUR: 6 },
         ...overrides,
     };
+}
+
+// Convite válido + resgate (trip_joins) — o que o client grava antes do auto-join.
+async function seedInviteAndClaim(opts: { inviteId?: string; tripId?: string; uid: string; inviteRole?: string; claimRole?: string }) {
+    const inviteId = opts.inviteId ?? 'invite-1';
+    const tripId = opts.tripId ?? 'trip-1';
+    await seed(async (db) => {
+        await setDoc(doc(db, 'invites', inviteId), { tripId, role: opts.inviteRole ?? 'EDITOR' });
+        await setDoc(doc(db, 'trip_joins', `${tripId}_${opts.uid}`), {
+            tripId, inviteId, role: opts.claimRole ?? opts.inviteRole ?? 'EDITOR', uid: opts.uid,
+        });
+    });
 }
 
 describe('firestore.rules — trips create (isCashzPremium)', () => {
@@ -135,6 +147,26 @@ describe('firestore.rules — trips update: edição normal', () => {
         );
     });
 
+    it('editor NÃO consegue virar dono trocando ownerId na edição normal', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            updateDoc(doc(asUser('editor-1'), 'trips', 'trip-1'), { ownerId: 'editor-1' })
+        );
+    });
+
+    it('nem o dono troca o ownerId pela edição normal (só pela transferência dedicada)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            updateDoc(doc(asUser('owner-1'), 'trips', 'trip-1'), { ownerId: 'editor-1' })
+        );
+    });
+
     it('viewer não edita a viagem', async () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip({
@@ -150,12 +182,60 @@ describe('firestore.rules — trips update: edição normal', () => {
 });
 
 describe('firestore.rules — trips update: auto-join via convite', () => {
-    it('usuário novo entra como EDITOR adicionando só a si mesmo', async () => {
+    it('usuário novo entra como EDITOR adicionando só a si mesmo (com resgate de convite EDITOR)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+        await seedInviteAndClaim({ uid: 'new-user', inviteRole: 'EDITOR' });
+
+        await assertSucceeds(
+            updateDoc(doc(asUser('new-user'), 'trips', 'trip-1'), {
+                participants: ['owner-1', 'editor-1', 'new-user'],
+                roles: { 'owner-1': 'OWNER', 'editor-1': 'EDITOR', 'new-user': 'EDITOR' },
+            })
+        );
+    });
+
+    it('quem só conhece o tripId (sem resgate de convite) não entra', async () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
         });
 
+        await assertFails(
+            updateDoc(doc(asUser('stranger-1'), 'trips', 'trip-1'), {
+                participants: ['owner-1', 'editor-1', 'stranger-1'],
+                roles: { 'owner-1': 'OWNER', 'editor-1': 'EDITOR', 'stranger-1': 'VIEWER' },
+            })
+        );
+    });
+
+    it('convite de VIEWER não dá EDITOR (papel do resgate tem que bater com o escolhido)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+        await seedInviteAndClaim({ uid: 'new-user', inviteRole: 'VIEWER' });
+
+        await assertFails(
+            updateDoc(doc(asUser('new-user'), 'trips', 'trip-1'), {
+                participants: ['owner-1', 'editor-1', 'new-user'],
+                roles: { 'owner-1': 'OWNER', 'editor-1': 'EDITOR', 'new-user': 'EDITOR' },
+            })
+        );
         await assertSucceeds(
+            updateDoc(doc(asUser('new-user'), 'trips', 'trip-1'), {
+                participants: ['owner-1', 'editor-1', 'new-user'],
+                roles: { 'owner-1': 'OWNER', 'editor-1': 'EDITOR', 'new-user': 'VIEWER' },
+            })
+        );
+    });
+
+    it('resgate de outra pessoa não vale pra mim', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+        await seedInviteAndClaim({ uid: 'someone-else', inviteRole: 'EDITOR' });
+
+        await assertFails(
             updateDoc(doc(asUser('new-user'), 'trips', 'trip-1'), {
                 participants: ['owner-1', 'editor-1', 'new-user'],
                 roles: { 'owner-1': 'OWNER', 'editor-1': 'EDITOR', 'new-user': 'EDITOR' },
@@ -167,6 +247,7 @@ describe('firestore.rules — trips update: auto-join via convite', () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
         });
+        await seedInviteAndClaim({ uid: 'new-user', inviteRole: 'EDITOR' });
 
         await assertFails(
             updateDoc(doc(asUser('new-user'), 'trips', 'trip-1'), {
@@ -180,6 +261,7 @@ describe('firestore.rules — trips update: auto-join via convite', () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
         });
+        await seedInviteAndClaim({ uid: 'new-user', inviteRole: 'EDITOR' });
 
         await assertFails(
             updateDoc(doc(asUser('new-user'), 'trips', 'trip-1'), {
@@ -262,12 +344,20 @@ describe('firestore.rules — trips update: transferir dono', () => {
 });
 
 describe('firestore.rules — trips delete', () => {
-    it('editor exclui a viagem', async () => {
+    it('dono exclui a viagem', async () => {
         await seed(async (db) => {
             await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
         });
 
-        await assertSucceeds(deleteDoc(doc(asUser('editor-1'), 'trips', 'trip-1')));
+        await assertSucceeds(deleteDoc(doc(asUser('owner-1'), 'trips', 'trip-1')));
+    });
+
+    it('editor NÃO exclui a viagem (só o dono)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(deleteDoc(doc(asUser('editor-1'), 'trips', 'trip-1')));
     });
 
     it('viewer não exclui a viagem', async () => {
@@ -352,6 +442,51 @@ describe('firestore.rules — expenses (canEdit)', () => {
                 tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
                 amountOriginal: 100, currency: 'EUR', amountBRL: 600,
                 paidBy: 'stranger-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+            })
+        );
+    });
+
+    it('cria despesa já marcada como comprada, com código de reserva', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertSucceeds(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+                paidBy: 'editor-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+                purchased: true, bookingRef: 'ABC123',
+            })
+        );
+    });
+
+    it('não cria despesa com `purchased` que não é booleano', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+                paidBy: 'editor-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+                purchased: 'sim',
+            })
+        );
+    });
+
+    it('não cria despesa com `bookingRef` acima de 300 caracteres', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+        });
+
+        await assertFails(
+            addDoc(collection(asUser('editor-1'), 'expenses'), {
+                tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+                amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+                paidBy: 'editor-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+                bookingRef: 'x'.repeat(301),
             })
         );
     });
@@ -587,5 +722,204 @@ describe('firestore.rules — invites (create por canEdit, sem update/delete)', 
 
         await assertFails(updateDoc(doc(asUser('editor-1'), 'invites', 'invite-1'), { role: 'VIEWER' }));
         await assertFails(deleteDoc(doc(asUser('editor-1'), 'invites', 'invite-1')));
+    });
+});
+
+describe('firestore.rules — expenses update (revalida o que mudou)', () => {
+    // `undefined` em override = omite a chave (Firestore rejeita undefined como valor) —
+    // é como se simula despesa antiga que nunca teve `date`.
+    const expenseDoc = (overrides: Record<string, unknown> = {}) => Object.fromEntries(
+        Object.entries({
+            tripId: 'trip-1', description: 'Hotel', category: 'Hospedagem',
+            amountOriginal: 100, currency: 'EUR', amountBRL: 600,
+            paidBy: 'editor-1', participants: ['owner-1', 'editor-1'], date: '2027-06-02',
+            ...overrides,
+        }).filter(([, value]) => value !== undefined)
+    );
+
+    async function seedExpense(overrides: Record<string, unknown> = {}) {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+            await setDoc(doc(db, 'expenses', 'exp-1'), expenseDoc(overrides));
+        });
+    }
+
+    it('editor altera descrição e valor válidos', async () => {
+        await seedExpense();
+        await assertSucceeds(
+            updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { description: 'Hotel Paris', amountBRL: 750 })
+        );
+    });
+
+    it('editor não zera nem negativa o valor', async () => {
+        await seedExpense();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { amountBRL: 0 }));
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { amountBRL: -50 }));
+    });
+
+    it('editor não deixa a despesa sem participantes', async () => {
+        await seedExpense();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { participants: [] }));
+    });
+
+    it('editor não troca paidBy por alguém de fora da viagem', async () => {
+        await seedExpense();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { paidBy: 'stranger-1' }));
+        await assertSucceeds(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { paidBy: 'owner-1' }));
+    });
+
+    it('editor não move a despesa pra outra viagem (tripId imutável)', async () => {
+        await seedExpense();
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-2'), baseTrip());
+        });
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { tripId: 'trip-2' }));
+    });
+
+    it('marcar `purchased` numa despesa antiga SEM `date` funciona (update parcial)', async () => {
+        await seedExpense({ date: undefined });
+        await assertSucceeds(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { purchased: true }));
+    });
+
+    it('`purchased` precisa ser booleano; `bookingRef` limitado a 300 caracteres', async () => {
+        await seedExpense();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { purchased: 'sim' }));
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { bookingRef: 'x'.repeat(301) }));
+        await assertSucceeds(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { purchased: true, bookingRef: 'ABC123' }));
+    });
+
+    it('remover o `bookingRef` (deleteField) é permitido', async () => {
+        await seedExpense({ purchased: true, bookingRef: 'ABC123' });
+        await assertSucceeds(updateDoc(doc(asUser('editor-1'), 'expenses', 'exp-1'), { bookingRef: deleteField() }));
+    });
+
+    it('viewer não altera despesa', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip({
+                participants: ['owner-1', 'viewer-1'],
+                roles: { 'owner-1': 'OWNER', 'viewer-1': 'VIEWER' },
+            }));
+            await setDoc(doc(db, 'expenses', 'exp-1'), expenseDoc({ paidBy: 'owner-1', participants: ['owner-1', 'viewer-1'] }));
+        });
+        await assertFails(updateDoc(doc(asUser('viewer-1'), 'expenses', 'exp-1'), { purchased: true }));
+    });
+});
+
+describe('firestore.rules — settlements update (revalida o que mudou)', () => {
+    async function seedSettlement() {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trips', 'trip-1'), baseTrip());
+            await setDoc(doc(db, 'settlements', 'set-1'), { tripId: 'trip-1', from: 'owner-1', to: 'editor-1', amount: 50 });
+        });
+    }
+
+    it('editor corrige o valor do acerto', async () => {
+        await seedSettlement();
+        await assertSucceeds(updateDoc(doc(asUser('editor-1'), 'settlements', 'set-1'), { amount: 40 }));
+    });
+
+    it('editor não zera nem negativa o valor do acerto', async () => {
+        await seedSettlement();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'settlements', 'set-1'), { amount: 0 }));
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'settlements', 'set-1'), { amount: -10 }));
+    });
+
+    it('editor não aponta o acerto pra alguém de fora da viagem', async () => {
+        await seedSettlement();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'settlements', 'set-1'), { to: 'stranger-1' }));
+    });
+
+    it('editor não move o acerto pra outra viagem (tripId imutável)', async () => {
+        await seedSettlement();
+        await assertFails(updateDoc(doc(asUser('editor-1'), 'settlements', 'set-1'), { tripId: 'trip-2' }));
+    });
+});
+
+describe('firestore.rules — trip_joins (resgate de convite)', () => {
+    it('cria o resgate com um convite válido daquela viagem e o mesmo papel', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'invites', 'invite-1'), { tripId: 'trip-1', role: 'EDITOR' });
+        });
+        await assertSucceeds(
+            setDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_new-user'), {
+                tripId: 'trip-1', inviteId: 'invite-1', role: 'EDITOR', uid: 'new-user',
+            })
+        );
+    });
+
+    it('não cria o resgate com convite inexistente', async () => {
+        await assertFails(
+            setDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_new-user'), {
+                tripId: 'trip-1', inviteId: 'nao-existe', role: 'EDITOR', uid: 'new-user',
+            })
+        );
+    });
+
+    it('não usa convite de OUTRA viagem', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'invites', 'invite-1'), { tripId: 'trip-2', role: 'EDITOR' });
+        });
+        await assertFails(
+            setDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_new-user'), {
+                tripId: 'trip-1', inviteId: 'invite-1', role: 'EDITOR', uid: 'new-user',
+            })
+        );
+    });
+
+    it('não declara papel maior que o do convite', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'invites', 'invite-1'), { tripId: 'trip-1', role: 'VIEWER' });
+        });
+        await assertFails(
+            setDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_new-user'), {
+                tripId: 'trip-1', inviteId: 'invite-1', role: 'EDITOR', uid: 'new-user',
+            })
+        );
+    });
+
+    it('não grava resgate em nome de outro uid', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'invites', 'invite-1'), { tripId: 'trip-1', role: 'EDITOR' });
+        });
+        await assertFails(
+            setDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_victim'), {
+                tripId: 'trip-1', inviteId: 'invite-1', role: 'EDITOR', uid: 'victim',
+            })
+        );
+    });
+
+    it('só o próprio uid lê o resgate; ninguém apaga', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'trip_joins', 'trip-1_new-user'), {
+                tripId: 'trip-1', inviteId: 'invite-1', role: 'EDITOR', uid: 'new-user',
+            });
+        });
+        await assertSucceeds(getDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_new-user')));
+        await assertFails(getDoc(doc(asUser('other-user'), 'trip_joins', 'trip-1_new-user')));
+        await assertFails(deleteDoc(doc(asUser('new-user'), 'trip_joins', 'trip-1_new-user')));
+    });
+});
+
+describe('firestore.rules — users: get liberado, list só admin', () => {
+    it('usuário logado lê o perfil de um uid específico (get)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'users', 'user-2'), { uid: 'user-2', email: 'user-2@example.com', displayName: 'Outro' });
+        });
+        await assertSucceeds(getDoc(doc(asUser('user-1'), 'users', 'user-2')));
+    });
+
+    it('usuário comum NÃO consegue listar a coleção users inteira', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'users', 'user-2'), { uid: 'user-2', email: 'user-2@example.com' });
+        });
+        await assertFails(getDocs(collection(asUser('user-1'), 'users')));
+    });
+
+    it('admin global lista a coleção users (contagem do /admin)', async () => {
+        await seed(async (db) => {
+            await setDoc(doc(db, 'users', 'admin-1'), { uid: 'admin-1', isAdmin: true });
+            await setDoc(doc(db, 'users', 'user-2'), { uid: 'user-2', email: 'user-2@example.com' });
+        });
+        await assertSucceeds(getDocs(collection(asUser('admin-1'), 'users')));
     });
 });

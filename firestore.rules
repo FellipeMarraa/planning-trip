@@ -38,6 +38,51 @@ service cloud.firestore {
       return 'ghosts' in data ? data.ghosts : {};
     }
 
+    // Resgate de convite: antes de entrar numa viagem por link, o usuário grava
+    // trip_joins/{tripId}_{uid} provando que conhece um convite VÁLIDO daquela
+    // viagem (ver regra de trip_joins abaixo). O auto-join em trips exige esse
+    // doc existir e com o mesmo papel — saber só o tripId não basta mais, e o
+    // papel não pode ser maior que o do convite.
+    function hasJoinClaim(tripId, uid, role) {
+      let path = /databases/$(database)/documents/trip_joins/$(tripId + '_' + uid);
+      return exists(path) && get(path).data.role == role;
+    }
+
+    // Campos novos de despesa (status de compra e código/link da reserva):
+    // tipo e tamanho validados em create e update. Chave ausente passa — despesa
+    // anterior a essa feature não tem esses campos.
+    function expenseFieldsValid(d) {
+      return (!('purchased' in d) || d.purchased is bool)
+        && (!('bookingRef' in d) || (d.bookingRef is string && d.bookingRef.size() <= 300));
+    }
+
+    // Update de despesa por owner/editor: revalida só o que MUDOU (diff). Um
+    // update parcial — ex.: marcar `purchased` numa despesa antiga sem `date` —
+    // não é reprovado por campo que ele nem toca. tripId é imutável (senão uma
+    // despesa poderia ser movida pra outra viagem em que o usuário também edita).
+    function expenseUpdateValid(tripId) {
+      let d = request.resource.data;
+      let changed = d.diff(resource.data).affectedKeys();
+      return !('tripId' in changed)
+        && (!('amountBRL' in changed) || (d.amountBRL is number && d.amountBRL > 0))
+        && (!('participants' in changed) || (d.participants is list && d.participants.size() > 0))
+        && (!('paidBy' in changed) || d.paidBy in tripData(tripId).participants)
+        && (!('date' in changed) || (d.date is string && d.date.size() > 0))
+        && expenseFieldsValid(d);
+    }
+
+    // Mesma ideia pra acerto: só revalida o que mudou. from/to são checados
+    // campo a campo (o outro lado pode ser um fantasma antigo, já fora de
+    // participants, e isso não deve travar uma edição que nem o toca).
+    function settlementUpdateValid(tripId) {
+      let d = request.resource.data;
+      let changed = d.diff(resource.data).affectedKeys();
+      return !('tripId' in changed)
+        && (!('amount' in changed) || (d.amount is number && d.amount > 0))
+        && (!('from' in changed) || d.from in tripData(tripId).participants)
+        && (!('to' in changed) || d.to in tripData(tripId).participants);
+    }
+
     // Espelha o isPlanActive() do CashZ: nunca confia só no campo `plan`
     // sincronizado, sempre recalcula a expiração contra o horário da própria
     // escrita. `plan`/`planExpiresAt` em users/{uid} só são escritos pelo
@@ -65,7 +110,11 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && (
         (
+          // ownerId só muda pela transferência dedicada (último branch, só o dono
+          // atual). Sem esta linha, um EDITOR trocava ownerId pra si mesmo aqui
+          // e virava dono de fato (passava a poder transferir e excluir a viagem).
           canEdit(tripId) &&
+          request.resource.data.ownerId == resource.data.ownerId &&
           request.resource.data.roles[resource.data.ownerId] == 'OWNER' &&
           resource.data.ownerId in request.resource.data.participants
         ) || (
@@ -73,6 +122,7 @@ service cloud.firestore {
           !(request.auth.uid in resource.data.participants) &&
           request.resource.data.participants == resource.data.participants.concat([request.auth.uid]) &&
           request.resource.data.roles[request.auth.uid] in ['EDITOR', 'VIEWER'] &&
+          hasJoinClaim(tripId, request.auth.uid, request.resource.data.roles[request.auth.uid]) &&
           request.resource.data.roles.diff(resource.data.roles).affectedKeys().hasOnly([request.auth.uid]) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'roles'])
         ) || (
@@ -105,7 +155,9 @@ service cloud.firestore {
         )
       );
 
-      allow delete: if canEdit(tripId);
+      // Só o dono exclui a viagem — editor gerencia despesas e membros, mas não
+      // apaga a viagem inteira (destrutivo e irreversível).
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.ownerId;
     }
 
     match /expenses/{expenseId} {
@@ -121,9 +173,10 @@ service cloud.firestore {
         && request.resource.data.amountBRL is number && request.resource.data.amountBRL > 0
         && request.resource.data.participants is list && request.resource.data.participants.size() > 0
         && request.resource.data.paidBy in tripData(request.resource.data.tripId).participants
-        && request.resource.data.date is string && request.resource.data.date.size() > 0;
+        && request.resource.data.date is string && request.resource.data.date.size() > 0
+        && expenseFieldsValid(request.resource.data);
       allow delete: if canEdit(resource.data.tripId);
-      allow update: if canEdit(resource.data.tripId) || (
+      allow update: if (canEdit(resource.data.tripId) && expenseUpdateValid(resource.data.tripId)) || (
         // Sair da viagem: o próprio participante troca seu uid por um fantasma
         // nesta despesa (como pagador e/ou como divisor), sem alterar mais nada.
         isParticipant(resource.data.tripId) &&
@@ -184,7 +237,13 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isSignedIn();
+      // `get` (um doc por uid) segue liberado pra qualquer logado — useUserProfiles
+      // precisa resolver nome/foto dos membros. `list` (varrer a coleção inteira)
+      // fica só pro admin global: antes, qualquer logado conseguia baixar e-mail e
+      // plano de TODOS os usuários do app com um getDocs(collection('users')).
+      // Agora é preciso já conhecer o uid (que só aparece em viagens em comum).
+      allow get: if isSignedIn();
+      allow list: if isGlobalAdmin();
 
       // `plan`/`planExpiresAt`/`planSyncedAt` (status de plano sincronizado
       // do CashZ) nunca podem ser escritos pelo client — só o Admin SDK do
@@ -212,7 +271,7 @@ service cloud.firestore {
         && request.resource.data.from in tripData(request.resource.data.tripId).participants
         && request.resource.data.to in tripData(request.resource.data.tripId).participants;
       allow delete: if canEdit(resource.data.tripId);
-      allow update: if canEdit(resource.data.tripId) || (
+      allow update: if (canEdit(resource.data.tripId) && settlementUpdateValid(resource.data.tripId)) || (
         // Sair da viagem: o próprio participante troca seu uid por um fantasma
         // neste acerto (como quem pagou e/ou como quem recebeu).
         isParticipant(resource.data.tripId) &&
@@ -263,6 +322,28 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if canEdit(request.resource.data.tripId);
       allow update, delete: if false;
+    }
+
+    // Resgate de convite — prova de que o usuário conhece um convite válido da
+    // viagem. Doc ID determinístico `${tripId}_${uid}` (a regra de trips confere
+    // por caminho, sem query). create/update (re-resgate com outro convite) só
+    // passam se o convite informado EXISTE, é daquela viagem e tem exatamente o
+    // papel declarado — então ninguém declara EDITOR com um convite de VIEWER.
+    // Sem delete: o doc é inofensivo parado (só vale junto de um convite real).
+    match /trip_joins/{joinId} {
+      allow create, update: if isSignedIn()
+        && request.resource.data.keys().hasAll(['tripId', 'inviteId', 'role', 'uid'])
+        && request.resource.data.keys().hasOnly(['tripId', 'inviteId', 'role', 'uid', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.tripId is string
+        && request.resource.data.inviteId is string
+        && request.resource.data.role in ['EDITOR', 'VIEWER']
+        && joinId == request.resource.data.tripId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/invites/$(request.resource.data.inviteId))
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteId)).data.tripId == request.resource.data.tripId
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteId)).data.role == request.resource.data.role;
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow delete: if false;
     }
 
     match /{document=**} {

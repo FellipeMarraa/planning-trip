@@ -450,6 +450,10 @@ export default function TripDetails() {
                                     <DropdownMenuItem onClick={() => copyInviteLink('VIEWER')}>
                                         <Share2 className="w-4 h-4 mr-2 text-chart-2" /> Convidar visualizador
                                     </DropdownMenuItem>
+                                </>
+                            )}
+                            {isOwner && (
+                                <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem variant="destructive" onClick={() => setIsDeleteTripOpen(true)}>
                                         <Trash2 className="w-4 h-4 mr-2" /> Excluir viagem

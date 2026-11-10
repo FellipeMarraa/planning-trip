@@ -24,7 +24,7 @@ export default function JoinTrip() {
                     return;
                 }
 
-                await joinTripByInvite(invite.tripId, invite.role, user.uid);
+                await joinTripByInvite(invite.tripId, invite.role, user.uid, inviteId);
                 navigate(`/trip/${invite.tripId}`);
             } catch (error) {
                 const code = (error as { code?: string })?.code || 'desconhecido';

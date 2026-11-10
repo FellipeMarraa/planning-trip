@@ -11,6 +11,7 @@ import {
     getDocs,
     query,
     serverTimestamp,
+    setDoc,
     updateDoc,
     where,
     writeBatch,
@@ -237,10 +238,31 @@ export async function leaveTripAsGhost(tripId: string, uid: string, displayName:
     });
 }
 
-export async function joinTripByInvite(tripId: string, role: string, uid: string) {
+export async function joinTripByInvite(tripId: string, role: string, uid: string, inviteId?: string) {
     const normalizedRole = role.toUpperCase();
     if (normalizedRole !== 'EDITOR' && normalizedRole !== 'VIEWER') {
         throw new Error('Papel de convite inválido');
+    }
+
+    // Resgate do convite: firestore.rules só aceita o auto-join se existir
+    // trip_joins/{tripId}_{uid} apontando pra um convite válido dessa viagem com
+    // o mesmo papel — saber só o tripId não basta. A falha NÃO é tratada como
+    // erro aqui: se a regra ainda for a antiga (sem trip_joins), a escrita é
+    // negada e o updateDoc abaixo — que é quem a regra de fato julga — segue
+    // funcionando; com a regra nova, convite inválido faz o updateDoc falhar.
+    // Assim o deploy do client e o das regras não precisam ser simultâneos.
+    if (inviteId) {
+        try {
+            await setDoc(doc(db, 'trip_joins', `${tripId}_${uid}`), {
+                tripId,
+                inviteId,
+                role: normalizedRole,
+                uid,
+                createdAt: serverTimestamp(),
+            });
+        } catch (error) {
+            console.warn('Resgate do convite não registrado (regras sem trip_joins ou convite inválido):', error);
+        }
     }
 
     // Não faz getDoc antes: quem ainda não é participante não tem permissão de
