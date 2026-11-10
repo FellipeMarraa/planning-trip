@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/section-header";
 import { EmptyState } from "@/components/common/empty-state";
 import { getMemberName } from "@/lib/members";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleDashed, ExternalLink, Pencil, Receipt, Ticket, Trash2, Users, Wallet } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Receipt, Trash2, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTimeBR } from "@/lib/dates";
 import { isPurchased } from "@/lib/purchaseStatus";
-import { parseBookingRef } from "@/lib/bookingRef";
+import { BookingRefLine, PurchaseCheck } from "@/components/trip/purchase-status-parts";
 import type { Expense, Trip, UserProfile } from '@/types';
 
 export type ExpenseSortKey = 'description' | 'category' | 'amountOriginal' | 'amountBRL';
@@ -37,62 +37,6 @@ interface ExpenseTableProps {
 
 const formatBRL = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-
-// Código/link da reserva sob a descrição. Link só quando é http(s) de verdade
-// (parseBookingRef); o resto é texto, truncado pra não estourar a linha.
-function BookingRefLine({ value }: { value: string | undefined }) {
-    const ref = parseBookingRef(value);
-    if (!ref) return null;
-
-    return (
-        <p className="text-xs text-muted-foreground flex items-center gap-1 max-w-[220px]">
-            <Ticket className="h-3 w-3 flex-shrink-0" aria-hidden />
-            {ref.kind === 'url' ? (
-                <a
-                    href={ref.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-primary hover:underline truncate"
-                    aria-label={`Abrir reserva em ${ref.label}`}
-                >
-                    <span className="truncate">{ref.label}</span>
-                    <ExternalLink className="h-3 w-3 flex-shrink-0" aria-hidden />
-                </a>
-            ) : (
-                <span className="truncate select-all" title={ref.label}>{ref.label}</span>
-            )}
-        </p>
-    );
-}
-
-// Check da primeira coluna: 1 toque alterna Pendente ↔ Comprado (tocar de novo
-// desfaz). Quem só visualiza vê o mesmo ícone, sem ação. Estado nunca só por
-// cor — formas diferentes (círculo cheio com check vs. tracejado) + texto na
-// célula de descrição.
-function PurchaseCheck({ purchased, description, canEdit, onToggle }: { purchased: boolean; description: string; canEdit: boolean; onToggle: () => void }) {
-    const Icon = purchased ? CheckCircle2 : CircleDashed;
-    const iconClass = cn("h-5 w-5", purchased ? "text-chart-2" : "text-muted-foreground/70");
-
-    if (!canEdit) {
-        return (
-            <span className="h-11 w-8 flex items-center justify-center" role="img" aria-label={purchased ? 'Comprado' : 'Pendente'}>
-                <Icon className={iconClass} />
-            </span>
-        );
-    }
-
-    return (
-        <button
-            type="button"
-            onClick={onToggle}
-            aria-pressed={purchased}
-            aria-label={purchased ? `Desmarcar ${description} como comprado` : `Marcar ${description} como comprado`}
-            className="h-11 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors"
-        >
-            <Icon className={iconClass} />
-        </button>
-    );
-}
 
 export function ExpenseTable({ trip, profiles, expenses, totalCount, canEdit, currentPage, totalPages, currentRates, isDomesticBRL, sortKey, sortDirection, onSort, onPageChange, onEdit, onDelete, onViewParticipants, onViewReceipt, onTogglePurchased }: ExpenseTableProps) {
     const SortableHeader = ({ column, label, align }: { column: ExpenseSortKey; label: string; align?: 'right' }) => (

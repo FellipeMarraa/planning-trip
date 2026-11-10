@@ -94,3 +94,47 @@ export function buildPurchaseValueUpdate(
         spreadApplied: 0,
     };
 }
+
+// Ordem de exibição das categorias no painel por categoria: as que costumam
+// exigir reserva antecipada primeiro (Hospedagem, Passagens...), depois o resto.
+// Categoria fora da lista (a categoria é texto livre) vai ao final, em ordem alfabética.
+const CATEGORY_DISPLAY_ORDER = ['Hospedagem', 'Passagens', 'Transporte', 'Passeios', 'Alimentação', 'Lazer', 'Compras', 'Outros'];
+
+export interface CategoryPurchaseGroup<T extends Pick<Expense, 'category' | 'purchased' | 'amountBRL'>> {
+    category: string;
+    // Pendentes primeiro (é o que pede ação), depois comprados; dentro de cada
+    // bloco, por data e depois descrição.
+    items: T[];
+    summary: PurchaseSummary;
+}
+
+export function groupPurchasesByCategory<T extends Pick<Expense, 'category' | 'purchased' | 'amountBRL' | 'description'> & { date?: string }>(
+    expenses: T[]
+): CategoryPurchaseGroup<T>[] {
+    const byCategory = new Map<string, T[]>();
+    for (const expense of expenses) {
+        const key = expense.category || 'Outros';
+        const list = byCategory.get(key);
+        if (list) list.push(expense);
+        else byCategory.set(key, [expense]);
+    }
+
+    const rank = (category: string) => {
+        const index = CATEGORY_DISPLAY_ORDER.indexOf(category);
+        return index === -1 ? CATEGORY_DISPLAY_ORDER.length : index;
+    };
+
+    return Array.from(byCategory.entries())
+        .sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, 'pt-BR'))
+        .map(([category, items]) => ({
+            category,
+            items: [...items].sort((a, b) => {
+                const byStatus = Number(isPurchased(a)) - Number(isPurchased(b));
+                if (byStatus !== 0) return byStatus;
+                // Sem data (despesa antiga) vai pro fim do bloco.
+                const byDate = (a.date || '￿').localeCompare(b.date || '￿');
+                return byDate || a.description.localeCompare(b.description, 'pt-BR');
+            }),
+            summary: summarizePurchases(items),
+        }));
+}

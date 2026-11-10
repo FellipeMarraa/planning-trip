@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPurchaseValueUpdate, isPurchased, matchesPurchaseFilter, summarizePurchases } from './purchaseStatus';
+import { buildPurchaseValueUpdate, groupPurchasesByCategory, isPurchased, matchesPurchaseFilter, summarizePurchases } from './purchaseStatus';
 
 describe('isPurchased', () => {
     it('só true explícito conta como comprado', () => {
@@ -110,5 +110,65 @@ describe('buildPurchaseValueUpdate', () => {
     it('despesa antiga sem exchangeRateUsed: deduz a taxa de amountBRL/amountOriginal', () => {
         const legacy = { amountOriginal: 500, amountBRL: 3000, currency: 'EUR' };
         expect(buildPurchaseValueUpdate(legacy, 600, undefined)!.exchangeRateUsed).toBe(6);
+    });
+});
+
+describe('groupPurchasesByCategory', () => {
+    const item = (overrides: Record<string, unknown>) => ({
+        description: 'Item',
+        category: 'Hospedagem',
+        amountBRL: 100,
+        purchased: false,
+        date: '2027-01-01T10:00',
+        ...overrides,
+    });
+
+    it('lista vazia = sem grupos', () => {
+        expect(groupPurchasesByCategory([])).toEqual([]);
+    });
+
+    it('agrupa por categoria, com Hospedagem/Passagens antes das demais e desconhecidas no fim', () => {
+        const groups = groupPurchasesByCategory([
+            item({ category: 'Compras' }),
+            item({ category: 'Zumba' }),
+            item({ category: 'Passagens' }),
+            item({ category: 'Hospedagem' }),
+            item({ category: 'Alimentação' }),
+            item({ category: 'Atelier' }),
+        ]);
+        expect(groups.map((g) => g.category)).toEqual(['Hospedagem', 'Passagens', 'Alimentação', 'Compras', 'Atelier', 'Zumba']);
+    });
+
+    it('dentro do grupo: pendentes primeiro, depois comprados; cada bloco por data', () => {
+        const [group] = groupPurchasesByCategory([
+            item({ description: 'Madrid', purchased: true, date: '2027-03-01T00:00' }),
+            item({ description: 'Roma', purchased: false, date: '2027-03-20T00:00' }),
+            item({ description: 'Barcelona', purchased: true, date: '2027-03-05T00:00' }),
+            item({ description: 'Paris', purchased: false, date: '2027-03-10T00:00' }),
+        ]);
+        expect(group.items.map((i) => i.description)).toEqual(['Paris', 'Roma', 'Madrid', 'Barcelona']);
+    });
+
+    it('despesa sem data vai para o fim do seu bloco', () => {
+        const [group] = groupPurchasesByCategory([
+            item({ description: 'Sem data', date: undefined }),
+            item({ description: 'Com data', date: '2027-01-01T00:00' }),
+        ]);
+        expect(group.items.map((i) => i.description)).toEqual(['Com data', 'Sem data']);
+    });
+
+    it('resumo do grupo considera só os itens dele', () => {
+        const groups = groupPurchasesByCategory([
+            item({ category: 'Hospedagem', purchased: true, amountBRL: 3200 }),
+            item({ category: 'Hospedagem', purchased: false, amountBRL: 3000 }),
+            item({ category: 'Passagens', purchased: true, amountBRL: 500 }),
+        ]);
+        expect(groups[0].summary).toMatchObject({ purchasedCount: 1, pendingCount: 1, purchasedBRL: 3200, pendingBRL: 3000 });
+        expect(groups[1].summary).toMatchObject({ purchasedCount: 1, pendingCount: 0, percentPurchased: 100 });
+    });
+
+    it('categoria vazia/ausente cai em "Outros"', () => {
+        const [group] = groupPurchasesByCategory([item({ category: '' })]);
+        expect(group.category).toBe('Outros');
     });
 });

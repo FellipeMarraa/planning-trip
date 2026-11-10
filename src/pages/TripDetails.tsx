@@ -27,6 +27,7 @@ import { ExpenseParticipantsModal } from "@/components/trip/ExpenseParticipantsM
 import { ReceiptModal } from "@/components/trip/ReceiptModal";
 import { PurchaseProgressCard } from "@/components/trip/PurchaseProgressCard";
 import { ConfirmPurchaseDialog } from "@/components/trip/ConfirmPurchaseDialog";
+import { PurchaseChecklist } from "@/components/trip/PurchaseChecklist";
 import {
     Calendar,
     LogOut,
@@ -511,6 +512,8 @@ export default function TripDetails() {
             )}
 
             <PurchaseProgressCard summary={purchaseSummary} />
+
+            <PurchaseChecklist expenses={visibleExpenses} canEdit={canEdit} onTogglePurchased={handleTogglePurchased} />
 
             <div className={cn("grid grid-cols-1 gap-4", !isDomesticBRL && "sm:grid-cols-3")}>
                 <StatCard
